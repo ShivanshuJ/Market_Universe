@@ -116,3 +116,28 @@ body.presenting{overflow:hidden}
   .fc-inner,.dcard,.dcard .fc-inner,.bg3d i{transition-duration:.01s}
   .flipped .stamp{animation:none;opacity:1}
 }
+
+/* ---- demo-first layout: three numbers, the key claims, one insight; the rest folds away ---- */
+.tiles.three{grid-template-columns:repeat(3,1fr)}
+@media (max-width:640px){.tiles.three{grid-template-columns:1fr}}
+.insight{font-size:20px;line-height:1.4;font-weight:600;margin:4px 0 8px}
+details.deep{margin-top:14px}
+details.deep>summary{cursor:pointer;list-style:none;padding:13px 18px;border:1px dashed var(--line);border-radius:14px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;background:var(--card);box-shadow:var(--shadow)}
+details.deep>summary::-webkit-details-marker{display:none}
+details.deep>summary b{font-size:16px}
+details.deep>summary b::before{content:"\25B8  "}
+details.deep[open]>summary b::before{content:"\25BE  "}
+details.deep[open]>summary{margin-bottom:12px}
+details.card>summary.stepsum{cursor:pointer;list-style:none}
+details.card>summary.stepsum::-webkit-details-marker{display:none}
+details.card>summary.stepsum::before{content:"\25B8  ";color:var(--muted)}
+details.card[open]>summary.stepsum::before{content:"\25BE  "}
+
+/* ---- thesis cards ---- */
+.tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;margin-top:10px;perspective:1300px}
+.th-st{font-size:19px;font-weight:700;line-height:1.35;margin:10px 0 8px}
+.sgns{display:flex;flex-wrap:wrap;gap:6px}
+.sgn{display:inline-flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--line);border-radius:99px;padding:2px 9px;background:var(--bg)}
+.sgn i{font-style:normal;font-weight:800}
+.sgn.pass{border-color:var(--ok);color:var(--ok)}.sgn.fail{border-color:var(--bad);color:var(--bad)}.sgn.skip{color:var(--muted)}
+.dscroll2{position:absolute;inset:12px 14px;overflow:auto}

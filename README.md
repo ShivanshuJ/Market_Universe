@@ -44,9 +44,31 @@ finishes, and checks the method against the company's own history (trend rule vs
 `python -m app.cli score` scores calls whose date has passed against fresh data. Nothing has been scored yet.
 A model, if a key is set, may only reword; the verdicts come from code.
 
+**The page opens as a two-minute demo view:** one sentence, three numbers, the four killed claims that matter (merged from the 14 tried)
+and one cautious insight. Everything else (all findings, heatmap, senior hires, exits, org tree, evidence, rival comparison) sits under
+a closed "Deep dive".
+
 **The interface is a deck of flip cards** (`web/cards.js`, `web/cards.css`, no libraries): every headline number flips to show how it is computed,
 every finding flips to its source and the people behind it, and the court is a 3D deck you move through with the arrow keys, flip with Space
 and show full screen with P. Names are blurred by default (a toggle reveals them), and motion respects the reduced-motion setting.
+
+## Thesis engine: what the data adds up to
+Counts alone do not say what a company is doing (Software Engineering is the biggest team almost everywhere). `app/thesis.py` states a
+claim only when a team **stands out** and the claim survives six independent checks, each from a different part of the data:
+
+| Check | What it asks |
+|---|---|
+| Distinctive | How much more of the hiring is in this team than at the other companies we have run (Groww's wealth team: 14.2x) |
+| Senior anchor | Is there a Director, VP or C-level hire whose title is about this team? (Groww: a VP of Private Wealth from IndusInd Bank) |
+| Feeder pool | Do the hires come from the same few employers, as a deliberate pipeline would? |
+| Open demand | Do open postings ask for more of the same? |
+| Momentum | Is the team still hiring once the unfinished latest month is ignored? |
+| Exits | Are people in the same function leaving as fast as they arrive? |
+
+The result is a card with a confidence (strong, moderate, weak), the evidence chain, who the company draws talent from, and
+**what would change our mind**. The claim also goes to the Claim Court like every other claim. Honest limits: "other companies" means
+the companies already run (shown on the card, and not always the same sector); the thresholds are ours; and it says what a team is
+doing, never why.
 
 ## Architecture
 ```mermaid
@@ -60,7 +82,8 @@ flowchart TB
     PE --> J["jobs<br/>Crustdata Job Search"]
     J --> X["exits<br/>Crustdata Person Search: roles that ended"]
     X --> A["analyse<br/>code only, no model"]
-    A --> CT["claim court<br/>every claim attacked, verdicts and predictions"]
+    A --> TH["thesis<br/>a team that stands out, six independent checks"]
+    TH --> CT["claim court<br/>every claim attacked, verdicts and predictions"]
     CT --> F["facts<br/>id + source + people behind each number"]
     F --> B["brief<br/>template, or a model rewrite that is checked"]
   end
@@ -91,7 +114,7 @@ Command line:
 python -m app.cli run "Which teams at Groww are growing fastest?" [--offline]
 python -m app.cli run "..." --crash-after people     # simulates a crash after a step
 python -m app.cli resume RUN_ID                      # continues, skipping finished steps
-python -m unittest discover -s tests -v              # 50 tests, no network
+python -m unittest discover -s tests -v              # 56 tests, no network
 python -m app.cli predictions                        # the dated calls on the record
 python -m app.cli score                              # score calls whose date has passed
 ```
@@ -126,3 +149,13 @@ Reporting lines (not in the data), contractors, per-team baselines against the p
 
 ## The future of this service
 Once agents do the whole job, the org chart stops being a report and becomes a living dataset: every rival, every team, refreshed continuously, with alerts when a rival hires a new head of a function, builds a team from a specific employer, or starts losing a team. The strategy team stops asking and starts being told, and the judgement call that remains (what to do about it) stays with a person.
+
+## Market view (home page `/`)
+
+Type only your company name. The app finds the rest itself:
+
+- **Present**: ~8 rivals (same industry and country, 0.25x to 4x your size, ranked by meaning and size closeness) with 12-month and 6-month headcount change, open roles, employee rating, last round and follower growth.
+- **Future**: companies *outside* your rivals building what you are building. Your strategy is inferred from your own hiring (the thesis engine run on your company); a company qualifies only if its team titles and its open roles both match.
+- **Past**: well-funded companies (>= $40M) whose weekly headcount fell >= 40% from a peak of 300+ people. The curve comes from data; the cause is shown only as linked web coverage, never guessed. Acquired companies are flagged.
+
+Limits we state on screen: direction is read from hiring, not intent; headcount series can lag; coverage links are unverified; "fallen" is relative to peak. A fresh run costs roughly 150 to 400 credits (Groww: 192, ~3.5 min under rate limits). The single-company deep analysis stays at `/index.html?company=NAME&auto=1`.

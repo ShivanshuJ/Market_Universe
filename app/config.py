@@ -29,6 +29,7 @@ def settings():
         "anthropic_key": g("ANTHROPIC_API_KEY", ""),
         "model": g("XRAY_MODEL", "claude-sonnet-5-5"),
         "budget": float(g("XRAY_BUDGET", "300")),
+        "market_budget": float(g("XRAY_MARKET_BUDGET", "600")),
         "max_people": int(g("XRAY_MAX_PEOPLE", "800")),
         "window_days": int(g("XRAY_WINDOW_DAYS", "365")),
         "max_exits": int(g("XRAY_MAX_EXITS", "800")),

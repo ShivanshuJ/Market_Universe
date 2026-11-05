@@ -127,7 +127,7 @@ details.cl>summary::-webkit-details-marker{display:none}
 <div class="wrap">
 <header>
   <h1>Org Chart X-Ray <span id="hdrTools" class="hdr-tools"></span></h1>
-  <div class="sub">Rebuild a rival's org chart from public hiring data. <span id="cfg" class="pill">checking...</span></div>
+  <div class="sub"><a href="/">&larr; Market view</a> &middot; Rebuild a rival's org chart from public hiring data. <span id="cfg" class="pill">checking...</span></div>
 </header>
 
 <section class="card">
@@ -142,50 +142,51 @@ details.cl>summary::-webkit-details-marker{display:none}
   </div>
 </section>
 
-<section class="card">
-  <h2>Steps <span id="runmeta" class="sub"></span></h2>
+<details class="card" id="stepsdet" open>
+  <summary class="stepsum"><h2 style="display:inline">Steps</h2> <span id="runmeta" class="sub"></span></summary>
   <ul class="steps" id="steps"></ul>
   <div id="stepwarn"></div>
-</section>
+</details>
 
 <div id="result" hidden>
   <section class="hero" id="hero"></section>
   <section class="card court" id="courtcard" hidden></section>
-  <section class="card" id="heatcard">
-    <h2>When each team ramped <span class="sub">(real external hires per month; darker = more)</span></h2>
-    <div id="heat"></div>
-  </section>
-  <section class="card" id="briefcard"></section>
-  <section class="card" id="seniorcard"></section>
-  <section class="card" id="exitscard" hidden></section>
-  <section class="card">
-    <h2>Why the numbers differ from a naive count</h2>
-    <div class="legend"><span><i class="sw" style="background:var(--accent)"></i>external joiners (hires)</span>
-      <span><i class="sw" style="background:var(--idle)"></i>re-recorded roles (excluded)</span></div>
-    <div id="dedupe"></div>
-    <div class="sub" id="dedupeNote"></div>
-  </section>
-  <section class="card">
-    <h2>Org tree: external joiners by team</h2>
-    <div class="slider"><span class="sub">Window start</span><input type="range" id="slide" min="0" max="0" value="0"><b id="slideLbl"></b></div>
-    <div class="legend"><span><i class="sw" style="background:var(--ok)"></i>growing</span>
-      <span>faded = fading</span><span>dashed = no department in data</span><span>dotted = open roles (from titles)</span>
-      <span>click a box to see the people</span></div>
-    <div id="tree"></div>
-  </section>
-  <div class="grid two">
-    <section class="card"><h2>Headcount (weekly series)</h2><div id="hc"></div><div class="sub" id="hcNote"></div></section>
-    <section class="card"><h2>Evidence <span class="sub" id="evTitle"></span></h2><div class="ev" id="ev"><span class="sub">Click a [F#] chip or a team box.</span></div></section>
-  </div>
-  <div class="foot" id="foot"></div>
+  <section class="card" id="insight" hidden></section>
+
+  <details class="deep" id="deep">
+    <summary><b>Deep dive</b> <span class="sub">all findings · heatmap · senior hires · exits · org tree · evidence · naive vs audited · calls on the record</span></summary>
+    <section class="card" id="courtmore" hidden></section>
+    <section class="card" id="briefcard"></section>
+    <section class="card" id="heatcard">
+      <h2>When each team ramped <span class="sub">(real external hires per month; darker = more)</span></h2>
+      <div id="heat"></div>
+    </section>
+    <section class="card" id="seniorcard"></section>
+    <section class="card" id="exitscard" hidden></section>
+    <section class="card">
+      <h2>Org tree: external joiners by team</h2>
+      <div class="slider"><span class="sub">Window start</span><input type="range" id="slide" min="0" max="0" value="0"><b id="slideLbl"></b></div>
+      <div class="legend"><span><i class="sw" style="background:var(--ok)"></i>growing</span>
+        <span>faded = fading</span><span>dashed = no department in data</span><span>dotted = open roles (from titles)</span>
+        <span>click a box to see the people</span></div>
+      <div id="tree"></div>
+    </section>
+    <div class="grid two">
+      <section class="card"><h2>Headcount (weekly series)</h2><div id="hc"></div><div class="sub" id="hcNote"></div></section>
+      <section class="card"><h2>Evidence <span class="sub" id="evTitle"></span></h2><div class="ev" id="ev"><span class="sub">Click a [F#] chip or a team box.</span></div></section>
+    </div>
+    <div class="foot" id="foot"></div>
+  </details>
 </div>
 
-<section class="card" id="cmpcard">
-  <h2>Compare rivals <span class="sub">(uses saved runs, no credits)</span></h2>
-  <div id="cmpList" class="sub">No saved runs yet. Run two or more companies first.</div>
-  <div class="row"><button class="btn primary" id="cmpGo" disabled>Compare selected</button></div>
-  <div id="cmpOut"></div>
-</section>
+<details class="deep" id="cmpdet">
+  <summary><b>Compare rivals</b> <span class="sub">talent flow between companies, from saved runs (no credits)</span></summary>
+  <section class="card" id="cmpcard">
+    <div id="cmpList" class="sub">No saved runs yet. Run two or more companies first.</div>
+    <div class="row"><button class="btn primary" id="cmpGo" disabled>Compare selected</button></div>
+    <div id="cmpOut"></div>
+  </section>
+</details>
 </div>
 
 <dialog id="dlg" style="border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);width:min(680px,92vw)">
@@ -196,7 +197,7 @@ details.cl>summary::-webkit-details-marker{display:none}
 
 <script>
 "use strict";
-var STEPS = ["parse","resolve","context","people","jobs","exits","analyse","court","brief"];
+var STEPS = ["parse","resolve","context","people","jobs","exits","analyse","thesis","court","brief"];
 var $ = function(id){ return document.getElementById(id); };
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
 var R = null, lastRun = null, es = null;
@@ -227,7 +228,7 @@ function addWarn(msg){
 
 function start(){
   var body = {request: $("req").value, company: $("company").value, offline: $("offline").checked};
-  resetSteps(); $("result").hidden = true; $("go").disabled = true;
+  resetSteps(); $("result").hidden = true; $("go").disabled = true; $("stepsdet").open = true;
   fetch("/api/run",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)})
     .then(function(r){return r.json();}).then(function(j){
       if(j.error){ addWarn(j.error); $("go").disabled = false; return; }
@@ -251,7 +252,7 @@ function watch(id){
   es.addEventListener("end", function(){
     es.close(); $("go").disabled = false;
     fetch("/api/run/"+id).then(function(r){return r.json();}).then(function(run){
-      if(run.status==="done") render(run.result); else if(run.status==="failed") $("resume").disabled=false;
+      if(run.status==="done"){ render(run.result); $("stepsdet").open = false; } else if(run.status==="failed") $("resume").disabled=false;
     });
   });
   es.onerror = function(){ /* the browser retries; the server closes after the end event */ };
@@ -276,9 +277,6 @@ function render(res){
   var a = res.analysis, months = a.window.months;
   // brief
   var b = res.brief, h = '<h2>Decision brief <span class="pill">'+esc(b.generated_by)+'</span></h2>';
-  h += '<p class="headline">'+esc(b.headline)+'</p>';
-  if(b.inference){ h += '<div class="inf"><b>Inference ('+esc(b.inference.confidence)+' confidence):</b> '+esc(b.inference.text)+
-      (b.inference.basis_fact_ids||[]).map(chip).join("")+'</div>'; }
   h += '<h2 style="margin-top:12px">Findings <span class="sub">(tap a card for its source)</span></h2>' + findingCards(b.findings);
   if(b.actions && b.actions.length){ h += '<h2 style="margin-top:14px">What to do</h2><ul>'+b.actions.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul>'; }
   h += '<h2 style="margin-top:14px">What we removed or cannot see</h2><ul class="warnbox">'+b.caveats.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul>';
@@ -286,34 +284,16 @@ function render(res){
   document.querySelectorAll("#briefcard .chip").forEach(function(c){ c.onclick = function(){ showFact(c.getAttribute("data-f")); }; });
   wireCards($("briefcard"));
 
-  drawDedupe(a, months);
   var sl = $("slide"); sl.max = months.length-1; sl.value = months.length-1;
   sl.oninput = function(){ drawTree(); drawHc(); };
   drawTree(); drawHc();
-  renderHero(res); renderCourt(res); renderHeat(a);
+  renderHero(res); renderCourt(res); renderInsight(res); renderHeat(a);
   renderSenior(a); renderExits(a); exportBar(); loadCompanies();
   $("foot").textContent = "Credits this run: "+res.credits+" | API calls: "+res.api_calls+" | cached responses reused: "+res.cache_hits+
     " | "+res.seconds+"s"+(res.offline?" | offline fixtures":"");
 }
 function chip(id){ return '<button class="chip" data-f="'+esc(id)+'">'+esc(id)+'</button>'; }
 
-function drawDedupe(a, months){
-  var ext = a.monthly.external, rel = a.monthly.relisted, W=900, H=150, pad=22;
-  var mx = Math.max.apply(null, months.map(function(m){return (ext[m]||0)+(rel[m]||0);}).concat([1]));
-  var bw = (W-2*pad)/months.length, s = "";
-  months.forEach(function(m,i){
-    var e = ext[m]||0, r = rel[m]||0, x = pad+i*bw+4, w = bw-8;
-    var he = (H-40)*e/mx, hr = (H-40)*r/mx;
-    s += '<rect x="'+x+'" y="'+(H-22-he)+'" width="'+w+'" height="'+he+'" fill="var(--accent)" rx="2"><title>'+m+': '+e+' external</title></rect>';
-    s += '<rect x="'+x+'" y="'+(H-22-he-hr)+'" width="'+w+'" height="'+hr+'" fill="var(--idle)" rx="2"><title>'+m+': '+r+' re-recorded</title></rect>';
-    s += '<text x="'+(x+w/2)+'" y="'+(H-8)+'" text-anchor="middle" style="font-size:10px">'+m.slice(2)+'</text>';
-    if(e+r>0) s += '<text x="'+(x+w/2)+'" y="'+(H-26-he-hr)+'" text-anchor="middle" style="font-size:10px">'+(e+r)+'</text>';
-  });
-  $("dedupe").innerHTML = '<svg viewBox="0 0 '+W+' '+H+'">'+s+'</svg>';
-  var c = a.counts;
-  $("dedupeNote").textContent = "A naive count would say "+c.in_window+" joiners. "+c.relisted+" of them already had an earlier role at this company that ended within "+
-    a.thresholds.relist_gap_days+" days, so they are re-recorded roles. Real external hires: "+c.external+".";
-}
 
 var selected = null;
 function drawTree(){
@@ -581,6 +561,9 @@ function flowNet(o){
     '<svg class="flownet" viewBox="0 0 '+W+' '+H+'" style="max-width:700px;margin:6px auto 0">'+s+'</svg>';
 }
 loadCompanies();
+(function(){ var p = new URLSearchParams(location.search), c = p.get("company");
+  if(c){ $("company").value = c; $("req").value = "Which teams at " + c + " are growing fastest?";
+    if(p.get("auto") === "1") setTimeout(function(){ $("go").click(); }, 300); } })();
 </script>
 <script src="/cards.js"></script>
 </body>

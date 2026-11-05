@@ -51,7 +51,7 @@ def pace_label(counts, k=0):
 
 
 # ------------------------------------------------------------------ the court
-def run_court(a, people, window_start, today, company=None, resolve=None, jobs_total=None):
+def run_court(a, people, window_start, today, company=None, resolve=None, jobs_total=None, thesis=None):
     c, ws = a["counts"], window_start
     months = a["window"]["months"]
     ext_m, rel_m = a["monthly"]["external"], a["monthly"]["relisted"]
@@ -229,6 +229,15 @@ def run_court(a, people, window_start, today, company=None, resolve=None, jobs_t
             "C12", "Is the data current?", "X-Ray", "The picture is as of %s" % hc["last_date"],
             [_t("Series age", "warn" if lag > 21 else "pass", "The headcount series ends %d days ago" % lag)],
             why="Profile data lags real life by up to a month."))
+
+    # ---- C13: X-Ray's own thesis is put on trial too
+    if thesis:
+        t = thesis[0]
+        tests = [_t(sg["name"], "pass" if sg["result"] == "pass" else ("fail" if sg["id"] == "exits" else "warn"), sg["detail"])
+                 for sg in t["signals"] if sg["result"] != "skip"]
+        if tests:
+            claims.append(_claim("C13", "What is the company building?", "X-Ray", t["statement"], tests,
+                                 why="%d of %d independent checks support it (%s confidence). %s" % (t["passes"], t["judged"], t["confidence"], t["falsifier"])))
 
     claims.sort(key=lambda x: (ORDER[x["verdict"]], x["id"]))
     n = {v: sum(1 for x in claims if x["verdict"] == v) for v in ORDER}

@@ -15,7 +15,7 @@ def _pct(x):
     return "%d%%" % round(100 * x)
 
 
-def build_facts(name, a, company_id, court=None):
+def build_facts(name, a, company_id, court=None, thesis=None):
     facts = []
 
     def add(text, source, evidence=None):
@@ -37,6 +37,12 @@ def build_facts(name, a, company_id, court=None):
             cs["tried"], cs["killed"], cs["weakened"], cs["survived"],
             (" Killed: " + "; ".join(cs["kills"][:3]) + ".") if cs["kills"] else ""),
             "X-Ray Claim Court: each claim attacked with the checks listed on the page")
+    if thesis:
+        t = thesis[0]
+        add("Thesis (%s confidence): %s. %d of %d independent checks support it%s." % (
+            t["confidence"], t["statement"], t["passes"], t["judged"],
+            ("; it is %.1fx as common as at the other companies run" % t["lift"]) if t.get("lift") else ""),
+            "X-Ray thesis engine: distinctiveness, senior anchor, feeder pool, open demand, momentum, exits", t["evidence"])
     hc = a.get("headcount")
     if hc and hc.get("total"):
         g = (hc.get("growth_percent") or {}).get("yoy")
@@ -115,25 +121,20 @@ def _top_dept_names(a, n=2):
 
 
 def tldr_text(name, a, court=None):
-    """One plain sentence a busy reader can repeat. Built only from computed numbers."""
-    c, om = a["counts"], a["overall_momentum"]
+    """Two plain sentences a busy reader can repeat. Built only from computed numbers."""
+    c = a["counts"]
     tops = _top_dept_names(a, 2)
     s = "%s added %d real hires since %s (%d re-recorded roles removed)" % (name, c["external"], a["window"]["start"], c["relisted"])
     if tops:
         s += ", led by " + " and ".join("%s (%d)" % (d["name"], d["external"]) for d in tops)
     s += "."
-    if om["label"] in ("growing", "fading", "steady"):
-        s += " Hiring pace is %s (%d in the last 6 months vs %d before)." % (om["label"], om["last6"], om["prev"])
-    n_s = len((a.get("senior") or {}).get("list") or [])
-    if n_s:
-        s += " %d senior leader%s joined." % (n_s, "" if n_s == 1 else "s")
     if court and court["summary"]["killed"]:
         cs = court["summary"]
         s += " X-Ray rejected %d naive claim%s, e.g. %s." % (cs["killed"], "" if cs["killed"] == 1 else "s", cs["headline_kill"] or "see the court")
     return s
 
 
-def template_brief(name, a, facts, court=None):
+def template_brief(name, a, facts, court=None, thesis=None):
     fid = {}
     for f in facts:  # map first words to ids so findings can cite them
         fid.setdefault(f["text"].split(":")[0].split(" (")[0][:40], f["id"])
@@ -163,6 +164,12 @@ def template_brief(name, a, facts, court=None):
             "text": "Hiring since %s is concentrated in %s. That points to continued investment there, but it is an "
                     "inference from public profile data, not a confirmed plan." % (a["window"]["start"], names),
             "confidence": conf, "basis_fact_ids": basis}
+    if thesis:
+        t = thesis[0]
+        fid = [f["id"] for f in facts if f["text"].startswith("Thesis")]
+        inference = {"text": "%s. %d of %d independent checks support it. It rests on public profile data, so it is a lean, not a plan. %s" % (
+            t["statement"], t["passes"], t["judged"], t["falsifier"]),
+            "confidence": {"strong": "high", "moderate": "medium", "weak": "low"}[t["confidence"]], "basis_fact_ids": fid}
     head = "%s: %d external hires in the window" % (name, c["external"])
     if tops:
         head += ", mostly " + " and ".join("%s (%d)" % (d["name"], d["external"]) for d in tops)

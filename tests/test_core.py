@@ -450,6 +450,77 @@ class ClaimCourt(unittest.TestCase):
         self.assertEqual(self.verdicts(ct)["C7"], "killed")
 
 
+WEALTH = "Wealth & Relationship Management"
+
+
+def wealth_people(n=14, extra_senior=True):
+    """n wealth hires spread over Apr-Oct 2026, mostly from the same two banks, plus a VP of Private Wealth."""
+    out = []
+    for i in range(n):
+        bank = "Bank A" if i % 2 == 0 else "Bank B"
+        prev = [{"cid": 900 + (i % 2), "name": bank, "title": "RM", "start": "2020-01-01", "end": "2026-02-01"}]
+        month = 4 + (i % 7)
+        out.append(dict(person(300 + i, "2026-%02d-10" % month, dept="Finance & Accounting", sub=WEALTH, past=prev), title="Wealth Partner"))
+    if extra_senior:
+        out.append(dict(person(399, "2026-05-01", dept="Finance & Accounting", sub=WEALTH,
+                               past=[{"cid": 900, "name": "Bank A", "title": "VP", "start": "2018-01-01", "end": "2026-03-01"}]),
+                        seniority="Vice President", title="Vice President - Private Wealth"))
+    out += [person(500 + i, "2026-06-10", sub="Software Engineering") for i in range(10)]
+    return out
+
+
+class ThesisEngine(unittest.TestCase):
+    JOBS = [{"title": "Relationship Manager - Wealth"}, {"title": "Private Wealth Advisor"}] + [{"title": "Backend Engineer"}] * 40
+
+    def theses(self, people, peers, leavers=None):
+        from app import thesis
+        a = analysis.analyze(people, "2025-11-01", TODAY, leavers=leavers)
+        return thesis.build_theses(a, "Acme", self.JOBS, peers)
+
+    def test_a_team_nobody_else_has_gets_a_strong_thesis_with_an_evidence_chain(self):
+        peers = [{"company": "Peer", "n": 100, "shares": {WEALTH: 0.0, "Software Engineering": 0.2}}]
+        t = self.theses(wealth_people(), peers, leavers=[])[0]
+        self.assertEqual(t["theme"], WEALTH)
+        res = {s["id"]: s["result"] for s in t["signals"]}
+        self.assertEqual((res["distinct"], res["anchor"], res["feeder"], res["demand"], res["momentum"]), ("pass",) * 5)
+        self.assertEqual(t["confidence"], "strong")
+        self.assertGreaterEqual(t["lift"], 2)
+        self.assertIn("is building out", t["statement"])
+        self.assertIn("60 days", t["falsifier"])
+
+    def test_the_biggest_team_is_not_a_thesis_when_every_peer_has_it_too(self):
+        peers = [{"company": "Peer", "n": 100, "shares": {WEALTH: 0.07, "Software Engineering": 0.36}}]
+        out = {t["theme"]: t for t in self.theses(wealth_people(), peers, leavers=[])}
+        se = out["Software Engineering"]
+        self.assertEqual([s["result"] for s in se["signals"] if s["id"] == "distinct"], ["fail"])
+        self.assertNotEqual(se["confidence"], "strong")
+
+    def test_without_peers_distinctiveness_is_skipped_not_invented(self):
+        t = self.theses(wealth_people(), [], leavers=[])[0]
+        self.assertEqual([s["result"] for s in t["signals"] if s["id"] == "distinct"], ["skip"])
+        self.assertIsNone(t["lift"])
+
+    def test_a_revolving_door_fails_the_exits_check(self):
+        peers = [{"company": "Peer", "n": 100, "shares": {WEALTH: 0.0}}]
+        leavers = [analysis.slim_leaver(raw_leaver(i, "2026-06-01", dest=(5, "X"), title="Wealth Partner"), CID) for i in range(16)]
+        t = self.theses(wealth_people(), peers, leavers=leavers)[0]
+        self.assertEqual([s["result"] for s in t["signals"] if s["id"] == "exits"], ["fail"])
+
+    def test_keywords_come_from_the_team_name(self):
+        from app import thesis
+        self.assertEqual(thesis.keywords(WEALTH), ["wealth", "relationship"])
+
+    def test_a_full_run_states_a_thesis_and_puts_it_on_trial(self):
+        os.environ["XRAY_DB"] = os.path.join(tempfile.mkdtemp(), "t.db")
+        st = Store(os.environ["XRAY_DB"])
+        rid = new_run(st, "Which teams at Groww are growing fastest?", offline=True)
+        self.assertEqual(execute(st, rid), "done")
+        res = st.get_run(rid)["result"]
+        self.assertTrue(res["thesis"]["theses"])
+        self.assertTrue(any(c["id"] == "C13" for c in res["court"]["claims"]))
+        self.assertTrue(res["brief"]["inference"]["text"].startswith(res["thesis"]["theses"][0]["statement"]))
+
+
 class Predictions(unittest.TestCase):
     def test_hash_is_deterministic_and_changes_with_the_call(self):
         from app import court

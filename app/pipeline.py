@@ -11,10 +11,11 @@ import uuid
 
 from . import analysis, brief
 from . import court as courtmod
+from . import thesis as thesismod
 from .config import settings
 from .crustdata import BudgetExceeded, Client, CrustdataError, OutOfCredits
 
-STEPS = ["parse", "resolve", "context", "people", "jobs", "exits", "analyse", "court", "brief"]
+STEPS = ["parse", "resolve", "context", "people", "jobs", "exits", "analyse", "thesis", "court", "brief"]
 RANGE_RANK = {"1": 0, "2-10": 1, "11-50": 2, "51-200": 3, "201-500": 4, "501-1000": 5, "1001-5000": 6,
               "5001-10000": 7, "10001+": 8}
 STOP = {"which", "what", "who", "show", "tell", "find", "how", "where", "when", "is", "are", "the", "a", "an", "i",
@@ -323,11 +324,24 @@ def step_analyse(ctx):
         c["external"], c["relisted"], c["returning"], c["unplaced"])}
 
 
+def step_thesis(ctx):
+    """Turn the counts into a testable claim about what the company is building, checked against the companies already run."""
+    o = ctx["out"]
+    a, co = o["analyse"]["analysis"], o["resolve"]["company"]
+    peers = thesismod.peer_profiles(ctx["client"].store, co["id"])
+    th = thesismod.build_theses(a, co["name"], o["jobs"]["jobs"], peers)
+    top = th[0] if th else None
+    return {"theses": th, "peers": [p["company"] for p in peers],
+            "message": ("Thesis: %s (%s, %d of %d checks), compared with %s" % (top["theme"], top["confidence"], top["passes"], top["judged"], ", ".join(p["company"] for p in peers) or "no other company yet"))
+            if top else "No team stands out enough to state a thesis"}
+
+
 def step_court(ctx):
     """Put every claim on trial. Pure code over what the earlier steps saved."""
     o = ctx["out"]
     ct = courtmod.run_court(o["analyse"]["analysis"], o["people"]["people"], ctx["run"]["params"]["window_start"], dt.date.today(),
-                            company=o["context"]["company"], resolve=o["resolve"], jobs_total=o["jobs"].get("total_reported"))
+                            company=o["context"]["company"], resolve=o["resolve"], jobs_total=o["jobs"].get("total_reported"),
+                            thesis=(o.get("thesis") or {}).get("theses"))
     s = ct["summary"]
     return {"court": ct, "message": "Claim Court: %d claims tried: %d killed, %d weakened, %d survived" % (s["tried"], s["killed"], s["weakened"], s["survived"])}
 
@@ -337,19 +351,21 @@ def step_brief(ctx):
     co = o["resolve"]["company"]
     a = o["analyse"]["analysis"]
     ct = (o.get("court") or {}).get("court")
-    facts = brief.build_facts(co["name"], a, co["id"], ct)
+    th = (o.get("thesis") or {}).get("theses")
+    facts = brief.build_facts(co["name"], a, co["id"], ct, th)
     b, why = (None, "no model key")
     if s["anthropic_key"]:
         b, why = brief.llm_brief(co["name"], a, facts, s["anthropic_key"], s["model"])
     note = None
     if b is None:
-        b = brief.template_brief(co["name"], a, facts, ct)
+        b = brief.template_brief(co["name"], a, facts, ct, th)
         note = "template brief used (%s)" % why
     return {"brief": b, "facts": facts, "message": "Brief written: %s%s" % (b["generated_by"], " - " + note if note else "")}
 
 
 FUNCS = {"parse": step_parse, "resolve": step_resolve, "context": step_context, "people": step_people,
-         "jobs": step_jobs, "exits": step_exits, "analyse": step_analyse, "court": step_court, "brief": step_brief}
+         "jobs": step_jobs, "exits": step_exits, "analyse": step_analyse, "thesis": step_thesis, "court": step_court,
+         "brief": step_brief}
 
 
 # ------------------------------------------------------------------ runner
@@ -409,6 +425,7 @@ def execute(store, run_id):
                           "enrich": {k: v for k, v in out["context"]["company"].items() if k != "headcount"}},
               "request": run["request"], "window": out["analyse"]["analysis"]["window"],
               "analysis": out["analyse"]["analysis"], "court": court_out,
+              "thesis": {"theses": (out.get("thesis") or {}).get("theses") or [], "peers": (out.get("thesis") or {}).get("peers") or []},
               "brief": out["brief"]["brief"], "facts": out["brief"]["facts"],
               "warnings": out["analyse"]["analysis"]["warnings"],
               "credits": round(client.spent, 2), "api_calls": client.calls, "cache_hits": client.cache_hits,

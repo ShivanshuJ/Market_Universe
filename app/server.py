@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, urlparse
 from . import export
 from .compare import compare
 from .config import ROOT, settings
+from . import market
 from .pipeline import PLACEHOLDERS, execute, new_run
 from .store import Store
 
@@ -27,7 +28,11 @@ def start_run_thread(run_id):
 
     def work():
         try:
-            execute(STORE, run_id)
+            run = STORE.get_run(run_id)
+            if run and (run["params"] or {}).get("kind") == "market":
+                market.execute_market(STORE, run_id)
+            else:
+                execute(STORE, run_id)
         finally:
             with ACTIVE_LOCK:
                 ACTIVE.discard(run_id)
@@ -75,6 +80,8 @@ class H(BaseHTTPRequestHandler):
                     continue
                 run = STORE.get_run(r["id"])
                 res = run["result"]
+                if res.get("kind") == "market":
+                    continue
                 cid = res["company"]["id"]
                 if (res["company"]["name"] or "").strip().lower() in PLACEHOLDERS:
                     continue  # saved by an older version that accepted "No-Company" for "No broker"
@@ -108,9 +115,14 @@ class H(BaseHTTPRequestHandler):
         if path == "/api/runs":
             return self._json(STORE.list_runs())
         if path == "/api/last":
+            want = (q.get("kind") or [""])[0]
             for r in STORE.list_runs(50):
-                if r["status"] == "done":
-                    return self._json({"id": r["id"], **STORE.get_run(r["id"])})
+                if r["status"] != "done":
+                    continue
+                run = STORE.get_run(r["id"])
+                is_market = (run["params"] or {}).get("kind") == "market"
+                if is_market == (want == "market"):
+                    return self._json({"id": r["id"], **run})
             return self._json({"error": "no finished runs yet"}, 404)
         if path.startswith("/api/run/"):
             run = STORE.get_run(path.rsplit("/", 1)[1])
@@ -120,7 +132,7 @@ class H(BaseHTTPRequestHandler):
             return self._json(run)
         if path.startswith("/api/stream/"):
             return self._stream(path.rsplit("/", 1)[1])
-        f = WEB / ("index.html" if path in ("/", "") else path.lstrip("/"))
+        f = WEB / ("market.html" if path in ("/", "") else path.lstrip("/"))
         if f.is_file() and WEB in f.resolve().parents:
             data = f.read_bytes()
             self.send_response(200)
@@ -140,6 +152,13 @@ class H(BaseHTTPRequestHandler):
                 return self._json({"error": "request is empty"}, 400)
             run_id = new_run(STORE, req, company=(b.get("company") or "").strip() or None,
                              offline=True if b.get("offline") else None)
+            start_run_thread(run_id)
+            return self._json({"run_id": run_id})
+        if path == "/api/market":
+            company = (self._body().get("company") or "").strip()
+            if not company:
+                return self._json({"error": "company is empty"}, 400)
+            run_id = market.new_market_run(STORE, company)
             start_run_thread(run_id)
             return self._json({"run_id": run_id})
         if path.startswith("/api/resume/"):

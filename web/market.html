@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market X-Ray</title>
+<link rel="stylesheet" href="/base.css">
+<link rel="stylesheet" href="/cards.css">
+<link rel="stylesheet" href="/market.css">
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Market X-Ray <span id="hdrTools" class="hdr-tools"></span></h1>
+  <div class="sub">Give it your company. It finds your rivals, who is heading where you are heading, and who fell. <a href="/index.html">Single-company analysis</a></div>
+</header>
+
+<section class="card">
+  <h2>Your company</h2>
+  <div class="row" style="margin-top:0">
+    <input type="text" id="co" placeholder="Company name or website, e.g. Groww" style="max-width:380px">
+    <button class="btn primary" id="go">Find my market</button>
+    <button class="btn" id="resume" disabled>Resume</button>
+    <button class="btn" id="last">Load last result</button>
+  </div>
+  <div class="sub" style="margin-top:8px">A company we have not looked at before uses roughly 150 to 400 credits. A repeat costs almost nothing.</div>
+</section>
+
+<details class="card" id="stepsdet" open>
+  <summary class="stepsum"><h2 style="display:inline">Steps</h2> <span id="runmeta" class="sub"></span></summary>
+  <ul class="steps" id="steps"></ul>
+  <div id="stepwarn"></div>
+</details>
+
+<div id="out" hidden>
+  <section class="hero" id="me"></section>
+  <nav class="tabs" id="tabs"></nav>
+  <section id="p-present"></section>
+  <section id="p-future" hidden></section>
+  <section id="p-past" hidden></section>
+  <div class="foot" id="foot"></div>
+</div>
+</div>
+
+<script>
+"use strict";
+/* helpers the shared card script expects */
+var $ = function(id){ return document.getElementById(id); };
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+function format(n){ return Number(n).toLocaleString(); }
+function chip(){ return ""; }
+function showFact(){}
+var R = null;
+</script>
+<script src="/cards.js"></script>
+<script src="/market.js"></script>
+</body>
+</html>

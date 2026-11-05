@@ -227,6 +227,7 @@ def analyze_exits(leavers, window_start, today, ext_people, truncated=False):
         "role_ends": len(ends), "internal_moves": len(internal), "left": len(gone), "truncated": truncated,
         "monthly": {m: {"hires": hire_m.get(m, 0), "exits": exit_m.get(m, 0)} for m in months},
         "net_total": len(ext_people) - len(gone),
+        "titles": [{"t": l["title"], "e": l["end"]} for l in gone][:700],  # lets the thesis engine see who left from a team
         "net_by_dept": net,
         "destinations": [{"name": dname.get(k) or "no current role listed", "cid": k if isinstance(k, int) else None, "n": n}
                          for k, n in dest.most_common(12)],
