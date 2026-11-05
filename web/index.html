@@ -88,17 +88,45 @@ a.btn{text-decoration:none;display:inline-block;color:var(--ink)}
 .tile span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
 .tile small{display:block;font-size:12px;color:var(--muted);margin-top:3px}
 .tile.wide{grid-column:span 2}
+.court h3{margin:0 0 4px;font-size:22px}
+.cnt{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.cbtn{border:2px solid var(--line);background:var(--card);border-radius:12px;padding:8px 16px;cursor:pointer;text-align:left;min-width:130px}
+.cbtn b{display:block;font-size:30px;line-height:1.05;font-variant-numeric:tabular-nums}
+.cbtn span{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.cbtn.killed{border-color:var(--bad)}.cbtn.killed b{color:var(--bad)}
+.cbtn.weakened{border-color:var(--warn)}.cbtn.weakened b{color:var(--warn)}
+.cbtn.survived{border-color:var(--ok)}.cbtn.survived b{color:var(--ok)}
+.cbtn.off{opacity:.4}
+.kills{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin:6px 0 14px}
+.kill{background:var(--bad-soft);border:1px solid var(--bad);border-radius:12px;padding:12px 14px}
+.kill .q{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--bad);font-weight:700}
+.kill .swap{display:flex;align-items:baseline;gap:10px;margin:6px 0;font-variant-numeric:tabular-nums}
+.kill .old{font-size:26px;font-weight:700;text-decoration:line-through;text-decoration-thickness:3px;color:var(--bad);opacity:.85}
+.kill .new{font-size:30px;font-weight:800;color:var(--ok)}
+.kill .why{font-size:13px}
+details.cl{border:1px solid var(--line);border-radius:10px;margin:6px 0;background:var(--card)}
+details.cl>summary{padding:9px 12px;cursor:pointer;list-style:none;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+details.cl>summary::-webkit-details-marker{display:none}
+.vchip{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:2px 9px;border-radius:99px;flex:none}
+.vchip.killed{background:var(--bad);color:#fff}.vchip.weakened{background:var(--warn);color:#fff}.vchip.survived{background:var(--ok);color:#fff}
+.cl .body{padding:2px 14px 12px}
+.tst{display:flex;gap:8px;padding:3px 0;font-size:13.5px}
+.tst i{font-style:normal;font-weight:800;width:16px;flex:none}
+.tst.pass i{color:var(--ok)}.tst.warn i{color:var(--warn)}.tst.fail i{color:var(--bad)}
+.pred{border:1px dashed var(--line);border-radius:10px;padding:8px 12px;margin:6px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+.pred code{font-size:11.5px;color:var(--muted)}
 .heat text{font-size:11px}
 .heat .lab{font-size:12px}
 .flownet text{font-size:12px}
 .legend{font-size:12px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap}
 .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 </style>
+<link rel="stylesheet" href="/cards.css">
 </head>
 <body>
 <div class="wrap">
 <header>
-  <h1>Org Chart X-Ray</h1>
+  <h1>Org Chart X-Ray <span id="hdrTools" class="hdr-tools"></span></h1>
   <div class="sub">Rebuild a rival's org chart from public hiring data. <span id="cfg" class="pill">checking...</span></div>
 </header>
 
@@ -122,6 +150,7 @@ a.btn{text-decoration:none;display:inline-block;color:var(--ink)}
 
 <div id="result" hidden>
   <section class="hero" id="hero"></section>
+  <section class="card court" id="courtcard" hidden></section>
   <section class="card" id="heatcard">
     <h2>When each team ramped <span class="sub">(real external hires per month; darker = more)</span></h2>
     <div id="heat"></div>
@@ -167,7 +196,7 @@ a.btn{text-decoration:none;display:inline-block;color:var(--ink)}
 
 <script>
 "use strict";
-var STEPS = ["parse","resolve","context","people","jobs","exits","analyse","brief"];
+var STEPS = ["parse","resolve","context","people","jobs","exits","analyse","court","brief"];
 var $ = function(id){ return document.getElementById(id); };
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
 var R = null, lastRun = null, es = null;
@@ -250,17 +279,18 @@ function render(res){
   h += '<p class="headline">'+esc(b.headline)+'</p>';
   if(b.inference){ h += '<div class="inf"><b>Inference ('+esc(b.inference.confidence)+' confidence):</b> '+esc(b.inference.text)+
       (b.inference.basis_fact_ids||[]).map(chip).join("")+'</div>'; }
-  h += b.findings.map(function(f){ return '<div class="finding">'+esc(f.text)+(f.fact_ids||[]).map(chip).join("")+'</div>'; }).join("");
+  h += '<h2 style="margin-top:12px">Findings <span class="sub">(tap a card for its source)</span></h2>' + findingCards(b.findings);
   if(b.actions && b.actions.length){ h += '<h2 style="margin-top:14px">What to do</h2><ul>'+b.actions.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul>'; }
   h += '<h2 style="margin-top:14px">What we removed or cannot see</h2><ul class="warnbox">'+b.caveats.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul>';
   $("briefcard").innerHTML = h;
   document.querySelectorAll("#briefcard .chip").forEach(function(c){ c.onclick = function(){ showFact(c.getAttribute("data-f")); }; });
+  wireCards($("briefcard"));
 
   drawDedupe(a, months);
   var sl = $("slide"); sl.max = months.length-1; sl.value = months.length-1;
   sl.oninput = function(){ drawTree(); drawHc(); };
   drawTree(); drawHc();
-  renderHero(res); renderHeat(a);
+  renderHero(res); renderCourt(res); renderHeat(a);
   renderSenior(a); renderExits(a); exportBar(); loadCompanies();
   $("foot").textContent = "Credits this run: "+res.credits+" | API calls: "+res.api_calls+" | cached responses reused: "+res.cache_hits+
     " | "+res.seconds+"s"+(res.offline?" | offline fixtures":"");
@@ -360,7 +390,7 @@ function personRows(ids, maxMonth){
   var ev = R.analysis.evidence, out = [];
   ids.forEach(function(id){ var e = ev[String(id)]; if(e && (!maxMonth || e.s.slice(0,7) <= maxMonth)) out.push(e); });
   return '<table><tr><th>Person</th><th>Role</th><th>Started</th><th>Before</th><th></th></tr>'+out.slice(0,80).map(function(e){
-    return '<tr><td>'+esc(e.n)+'</td><td>'+esc(e.t)+'</td><td>'+esc(e.s)+'</td><td>'+esc(e.p||"-")+'</td><td>'+(e.k==="returning"?'<span class="pill warn">returning</span>':"")+'</td></tr>';
+    return '<tr><td class="pn">'+esc(e.n)+'</td><td>'+esc(e.t)+'</td><td>'+esc(e.s)+'</td><td>'+esc(e.p||"-")+'</td><td>'+(e.k==="returning"?'<span class="pill warn">returning</span>':"")+'</td></tr>';
   }).join("")+'</table>'+(out.length>80?'<div class="sub">first 80 of '+out.length+'</div>':"");
 }
 function showFact(id){
@@ -376,20 +406,6 @@ function showGroup(dept, sub){
   var extra = d.top_prev.length && !sub ? '<p class="sub">Most common previous employers: '+d.top_prev.map(function(p){return esc(p.name)+" ("+p.n+")";}).join(", ")+'</p>' : "";
   $("evTitle").textContent = "· "+label;
   $("ev").innerHTML = extra + personRows(ids, mm);
-}
-
-/* ---------------- senior hires radar ---------------- */
-function renderSenior(a){
-  var sn = a.senior || {list:[], counts:{}}, el = $("seniorcard"), c = sn.counts || {};
-  var head = '<h2>Senior hires radar <span class="sub">Director, VP and C-level who joined in the window</span></h2>';
-  if(!sn.list.length){ el.innerHTML = head+'<div class="sub">No senior hires found in the window.</div>'; return; }
-  var sub = ["CXO","Vice President","Director"].filter(function(k){return c[k];}).map(function(k){
-    return c[k]+" "+k+(c[k]>1 && k!=="CXO" ? "s" : ""); }).join(" · ");
-  el.innerHTML = head+'<div class="sub" style="margin-bottom:6px">'+esc(sub)+'. A new senior leader says more about direction than a dozen junior hires.</div>'+
-    seniorTimeline(a)+'<div class="legend"><span><i class="sw" style="background:var(--bad);border-radius:50%"></i>C-level</span><span><i class="sw" style="background:var(--accent);border-radius:50%"></i>VP</span><span><i class="sw" style="background:var(--ok);border-radius:50%"></i>Director</span><span>hover a dot for title and previous employer</span></div>'+
-    '<table style="margin-top:8px"><tr><th>Level</th><th>Title</th><th>Name</th><th>Joined</th><th>Came from</th></tr>'+
-    sn.list.slice(0,12).map(function(s){ return '<tr><td>'+esc(s.level)+'</td><td>'+esc(s.title)+'</td><td>'+esc(s.name)+'</td><td>'+esc(s.start)+'</td><td>'+esc(s.prev||"-")+'</td></tr>'; }).join("")+
-    '</table>'+(sn.list.length>12 ? '<div class="sub">first 12 of '+sn.list.length+'</div>' : "");
 }
 
 /* ---------------- exits and net change ---------------- */
@@ -491,44 +507,6 @@ function renderCompare(o){
     '<ul class="warnbox">'+o.caveats.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul>';
   out.innerHTML = h;
 }
-/* ---------------- hero: one sentence, big numbers ---------------- */
-function countUp(el, to, dec){
-  var t0 = null;
-  function step(ts){
-    if(t0 === null) t0 = ts;
-    var p = Math.min(1, (ts - t0) / 700), v = to * (1 - Math.pow(1 - p, 3));
-    el.textContent = dec ? v.toFixed(dec) : Math.round(v).toLocaleString();
-    if(p < 1) requestAnimationFrame(step);
-  }
-  requestAnimationFrame(step);
-}
-function renderHero(res){
-  var a = res.analysis, b = res.brief, c = a.counts, hc = a.headcount, om = a.overall_momentum, ex = a.exits;
-  var sn = (a.senior && a.senior.list) || [], months = a.window.months, ext = a.monthly.external;
-  var mx = Math.max.apply(null, months.map(function(m){return ext[m]||0;}).concat([1]));
-  var spark = '<svg viewBox="0 0 300 46" style="height:46px">'+months.map(function(m,i){
-    var v = ext[m]||0, h = 4 + 38*v/mx, w = 300/months.length;
-    return '<rect x="'+(i*w+2)+'" y="'+(46-h)+'" width="'+(w-4)+'" height="'+h+'" rx="2" fill="var(--accent)" opacity="'+(0.35+0.65*v/mx)+'"><title>'+m+': '+v+' hires</title></rect>';
-  }).join("")+'</svg>';
-  var paceCls = om.label==="growing" ? "pos" : om.label==="fading" ? "neg" : "";
-  var tiles = [];
-  tiles.push('<div class="tile"><span>Real hires</span><b data-count="'+c.external+'">0</b><small>'+c.in_window+' raw "joiners", '+c.relisted+' re-recorded removed</small></div>');
-  if(hc && hc.total) tiles.push('<div class="tile"><span>Hiring intensity</span><b data-count="'+(100*c.external/hc.total).toFixed(1)+'" data-dec="1">0</b><small>% of headcount ('+format(hc.total)+')</small></div>');
-  tiles.push('<div class="tile"><span>Pace</span><b class="'+paceCls+'" style="font-size:22px;padding-top:6px">'+esc(om.label.indexOf("not comparable")===0 ? "capped" : om.label)+'</b><small>'+om.last6+' in the last 6 months vs '+om.prev+' before</small></div>');
-  tiles.push('<div class="tile"><span>Senior hires</span><b data-count="'+sn.length+'">0</b><small>Director, VP and C-level</small></div>');
-  if(ex) tiles.push('<div class="tile"><span>People who left</span><b data-count="'+ex.left+'">0</b><small>+ '+ex.internal_moves+' moved inside the company</small></div>');
-  if(a.open_roles && a.open_roles.total_reported) tiles.push('<div class="tile"><span>Open postings</span><b data-count="'+a.open_roles.total_reported+'">0</b><small>across job sources</small></div>');
-  tiles.push('<div class="tile wide"><span>Real hires by month</span>'+spark+'</div>');
-  var by = (b.generated_by||"").indexOf("model")===0 ? "model-written, every number checked against the facts" : "written by code from the computed facts";
-  var conf = b.inference ? ' <span class="pill '+(b.inference.confidence==="high"?"ok":b.inference.confidence==="medium"?"warn":"bad")+'">'+esc(b.inference.confidence)+' confidence</span>' : "";
-  $("hero").innerHTML = '<div class="kicker">'+esc(res.company.name)+' · '+esc(a.window.start)+' to '+esc(a.window.end)+'</div>'+
-    '<p class="tldr">'+esc(b.tldr || b.headline)+'</p>'+
-    '<div class="sub">Summary '+esc(by)+'.'+conf+'</div><div class="tiles">'+tiles.join("")+'</div>';
-  document.querySelectorAll("#hero [data-count]").forEach(function(el){
-    countUp(el, parseFloat(el.getAttribute("data-count")), el.getAttribute("data-dec") ? 1 : 0);
-  });
-}
-
 /* ---------------- heatmap: when each team ramped ---------------- */
 function renderHeat(a){
   var months = a.window.months, rows = a.depts.filter(function(d){return d.name!=="Unplaced";}).slice(0,9);
@@ -604,5 +582,6 @@ function flowNet(o){
 }
 loadCompanies();
 </script>
+<script src="/cards.js"></script>
 </body>
 </html>

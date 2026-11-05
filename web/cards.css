@@ -1,0 +1,118 @@
+/* 3D layer: flip cards, tilt, the claim deck and presentation mode. Loaded after the page's own styles. */
+:root{--shadow:0 1px 0 rgba(255,255,255,.05) inset,0 24px 38px -24px rgba(0,0,0,.6),0 2px 6px rgba(0,0,0,.2)}
+:root[data-theme="light"]{--shadow:0 1px 0 rgba(255,255,255,.9) inset,0 22px 34px -24px rgba(30,40,80,.45),0 2px 6px rgba(30,40,80,.12)}
+:root[data-theme="dark"]{
+  --bg:#0e1115; --card:#171b21; --ink:#e8ebef; --muted:#98a2ae; --line:#2a313a;
+  --accent:#7a9cff; --accent-soft:#1b2440; --ok:#4cc27f; --ok-soft:#14301f;
+  --warn:#f0b04a; --warn-soft:#38290f; --bad:#ff7a73; --bad-soft:#3a1918; --idle:#39414c;
+}
+:root[data-theme="light"]{
+  --bg:#f4f5f8; --card:#fff; --ink:#14171c; --muted:#5b6470; --line:#dde1e8;
+  --accent:#2f5bea; --accent-soft:#e6ecfd; --ok:#17884a; --ok-soft:#dff3e7;
+  --warn:#a85f00; --warn-soft:#fff0d3; --bad:#c0302b; --bad-soft:#fde4e2; --idle:#c9cfd8;
+}
+body{background:var(--bg);position:relative}
+
+/* depth: soft coloured light that drifts with the pointer */
+.bg3d{position:fixed;inset:-12%;z-index:-1;pointer-events:none;overflow:hidden}
+.bg3d i{position:absolute;border-radius:50%;filter:blur(80px);opacity:.28;transition:transform .5s ease-out}
+:root[data-theme="light"] .bg3d i{opacity:.16}
+.bg3d i:nth-child(1){width:46vw;height:46vw;left:-6vw;top:-8vw;background:var(--accent)}
+.bg3d i:nth-child(2){width:36vw;height:36vw;right:-8vw;top:24vh;background:var(--ok)}
+.bg3d i:nth-child(3){width:32vw;height:32vw;left:34vw;bottom:-14vw;background:var(--bad)}
+
+.card,.hero{box-shadow:var(--shadow)}
+.hdr-tools{display:inline-flex;gap:6px;margin-left:8px;vertical-align:middle}
+.btn.small{padding:3px 10px;font-size:12px}
+
+/* privacy: names are blurred unless you ask to see them */
+.hide-names .pn{filter:blur(6px);user-select:none}
+
+/* ---- flip cards ---- */
+.tiles,.fgrid,.sgrid,.pgrid{perspective:1300px}
+.fgrid,.sgrid,.pgrid{display:grid;gap:12px;margin-top:8px}
+.fgrid{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.sgrid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+.pgrid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.fc{position:relative;height:var(--h,140px);transform-style:preserve-3d;transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));
+  transition:transform .18s ease-out;cursor:pointer;outline:none;border-radius:16px}
+.fc:focus-visible{box-shadow:0 0 0 3px var(--accent)}
+.fc-inner{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .8s cubic-bezier(.2,.9,.25,1)}
+.fc.flipped>.fc-inner{transform:rotateY(180deg)}
+.fc-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:16px;padding:12px 14px;
+  background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow);overflow:hidden}
+.fc-face::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(135deg,rgba(255,255,255,.08),transparent 45%)}
+.fc-back{transform:rotateY(180deg);background:linear-gradient(160deg,var(--accent-soft),var(--card) 70%)}
+.t-l{display:block;font-size:11.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.t-v{display:block;font-size:32px;line-height:1.1;margin:2px 0;font-variant-numeric:tabular-nums}
+.fc small{display:block;font-size:12px;color:var(--muted);line-height:1.3}
+.t-h{position:absolute;right:12px;bottom:8px;font-size:10.5px;font-style:normal;color:var(--muted);opacity:.8}
+.fs{font-size:13px;line-height:1.4;margin:6px 0}
+.ft{font-size:14px;line-height:1.38;max-height:104px;overflow:hidden}
+.fchips{position:absolute;left:12px;bottom:8px}
+.fc.plain{cursor:default}
+.tilecard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;box-shadow:var(--shadow);grid-column:span 2}
+.vtag{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:1px 8px;border-radius:99px;color:#fff;margin-bottom:6px}
+.vtag.CXO{background:var(--bad)}.vtag.VP{background:var(--accent)}.vtag.Director{background:var(--ok)}
+
+/* ---- the claim deck (3D coverflow) ---- */
+.deckwrap{position:relative;margin-top:8px;outline:none}
+.dctl{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+.dnav{display:flex;gap:8px;align-items:center}
+.dnav .btn{min-width:42px}
+#dCount{min-width:64px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
+.deck{position:relative;height:540px;perspective:1700px;overflow:hidden;margin:6px 0 2px}
+.dstage{position:absolute;inset:0;transform-style:preserve-3d}
+.dcard{position:absolute;left:50%;top:16px;width:min(590px,88%);height:500px;transform-style:preserve-3d;cursor:pointer;
+  transition:transform .7s cubic-bezier(.2,.9,.25,1),opacity .45s}
+.dcard .fc-inner{transition:transform .9s cubic-bezier(.2,.9,.25,1)}
+.dcard.flipped>.fc-inner{transform:rotateY(180deg)}
+.dcard .fc-face{padding:20px 22px;border-width:2px;background:var(--card)}
+.dcard.killed .fc-face{border-color:var(--bad);box-shadow:var(--shadow),inset 0 6px 0 var(--bad)}
+.dcard.weakened .fc-face{border-color:var(--warn);box-shadow:var(--shadow),inset 0 6px 0 var(--warn)}
+.dcard.survived .fc-face{border-color:var(--ok);box-shadow:var(--shadow),inset 0 6px 0 var(--ok)}
+.dcard:not(.active){cursor:pointer}
+.d-top{display:flex;justify-content:space-between;font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.dcard h4{margin:12px 0 6px;font-size:20px}
+.d-claim{font-size:22px;font-weight:700;line-height:1.3;margin:6px 0}
+.d-big{font-size:76px;font-weight:800;line-height:1;margin-top:22px;font-variant-numeric:tabular-nums;color:var(--bad);opacity:.92}
+.d-big.sm{font-size:44px}
+.d-bl{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+.d-hint{position:absolute;left:22px;bottom:16px;font-size:12.5px;color:var(--muted)}
+.d-swap{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;font-variant-numeric:tabular-nums;margin:2px 0 6px}
+.d-swap s{font-size:34px;font-weight:700;color:var(--bad);text-decoration-thickness:4px}
+.d-swap span{font-size:24px;color:var(--muted)}
+.d-swap b{font-size:44px;font-weight:800;color:var(--ok)}
+.d-swap small{flex-basis:100%;font-size:12px;color:var(--muted)}
+.dscroll{position:absolute;left:22px;right:22px;top:158px;bottom:14px;overflow:auto;padding-right:4px}
+.dscroll.noswap{top:92px}
+.stamp{position:absolute;right:18px;top:16px;border:4px solid;border-radius:10px;padding:1px 12px;font-weight:900;letter-spacing:2px;font-size:22px;opacity:0;transform:rotate(-10deg)}
+.flipped .stamp{animation:stampIn .55s .55s cubic-bezier(.2,1.4,.4,1) forwards}
+@keyframes stampIn{from{opacity:0;transform:rotate(-10deg) scale(2.6)}to{opacity:1;transform:rotate(-10deg) scale(1)}}
+.stamp.killed{color:var(--bad);border-color:var(--bad)}.stamp.weakened{color:var(--warn);border-color:var(--warn)}.stamp.survived{color:var(--ok);border-color:var(--ok)}
+.dots{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin:2px 0 6px}
+.dots i{width:11px;height:11px;border-radius:50%;background:var(--idle);cursor:pointer;transition:transform .2s;display:block}
+.dots i.killed{background:var(--bad)}.dots i.weakened{background:var(--warn)}.dots i.survived{background:var(--ok)}
+.dots i.on{transform:scale(1.7);box-shadow:0 0 0 3px var(--card),0 0 0 5px currentColor}
+.dots i.on.killed{color:var(--bad)}.dots i.on.weakened{color:var(--warn)}.dots i.on.survived{color:var(--ok)}
+
+/* ---- presentation mode ---- */
+.deckwrap.present{position:fixed;inset:0;z-index:80;background:var(--bg);padding:18px 26px;display:flex;flex-direction:column}
+.deckwrap.present .deck{flex:1;height:auto;margin-top:10px}
+.deckwrap.present .dcard{height:calc(100% - 30px);width:min(900px,92%)}
+.deckwrap.present .d-claim{font-size:32px}
+.deckwrap.present .dcard h4{font-size:26px}
+.deckwrap.present .d-big{font-size:110px}
+.deckwrap.present .d-swap b{font-size:64px}.deckwrap.present .d-swap s{font-size:46px}
+.deckwrap.present .dscroll{top:210px;font-size:17px}
+.deckwrap.present .dscroll.noswap{top:110px}
+.deckwrap.present .tst{font-size:17px}
+body.presenting{overflow:hidden}
+
+@media (max-width:640px){
+  .deck{height:560px}.d-big{font-size:56px}.dcard{width:94%}
+}
+@media (prefers-reduced-motion:reduce){
+  .fc-inner,.dcard,.dcard .fc-inner,.bg3d i{transition-duration:.01s}
+  .flipped .stamp{animation:none;opacity:1}
+}
