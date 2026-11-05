@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Org Chart X-Ray</title>
+<style>
+:root{
+  --bg:#f4f5f8; --card:#fff; --ink:#14171c; --muted:#5b6470; --line:#dde1e8;
+  --accent:#2f5bea; --accent-soft:#e6ecfd; --ok:#17884a; --ok-soft:#dff3e7;
+  --warn:#a85f00; --warn-soft:#fff0d3; --bad:#c0302b; --bad-soft:#fde4e2; --idle:#c9cfd8;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1115; --card:#171b21; --ink:#e8ebef; --muted:#98a2ae; --line:#2a313a;
+    --accent:#7a9cff; --accent-soft:#1b2440; --ok:#4cc27f; --ok-soft:#14301f;
+    --warn:#f0b04a; --warn-soft:#38290f; --bad:#ff7a73; --bad-soft:#3a1918; --idle:#39414c;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,textarea{font:inherit;color:inherit}
+.wrap{max-width:1040px;margin:0 auto;padding:16px 16px 70px}
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between;margin-bottom:6px}
+h1{font-size:20px;margin:0}
+.sub{color:var(--muted);font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:14px}
+.card h2{font-size:12px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+textarea,input[type=text]{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+textarea{min-height:64px;resize:vertical}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
+.btn{border:1px solid var(--line);background:var(--card);padding:7px 14px;border-radius:8px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn:disabled{opacity:.5;cursor:default}
+.pill{display:inline-block;padding:1px 9px;border-radius:99px;font-size:12px;font-weight:600;background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.pill.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.pill.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.pill.bad{background:var(--bad-soft);color:var(--bad);border-color:transparent}
+.steps{list-style:none;margin:0;padding:0}
+.steps li{display:flex;gap:10px;padding:5px 0;border-bottom:1px dashed var(--line);align-items:baseline}
+.steps li:last-child{border:0}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--idle);flex:none;margin-top:5px}
+.dot.running{background:var(--accent);animation:p 1s infinite}
+.dot.done{background:var(--ok)} .dot.failed,.dot.needs_input{background:var(--bad)} .dot.skipped{background:var(--warn)}
+@keyframes p{50%{opacity:.3}}
+.sname{width:80px;font-weight:600;flex:none}
+.smsg{color:var(--muted);font-size:13px;flex:1}
+.headline{font-size:19px;font-weight:700;margin:0 0 8px}
+.inf{background:var(--accent-soft);border-radius:10px;padding:10px 12px;margin:10px 0}
+.finding{padding:5px 0;border-bottom:1px dashed var(--line)}
+.chip{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:0 6px;font-size:12px;cursor:pointer;margin-left:4px;color:var(--accent)}
+.chip:hover{border-color:var(--accent)}
+.warnbox{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:8px 12px;margin-top:6px;font-size:13.5px}
+.warnbox li{margin:3px 0}
+.grid{display:grid;grid-template-columns:1fr;gap:14px}
+@media (min-width:900px){.two{grid-template-columns:1fr 1fr}}
+svg{width:100%;height:auto;display:block}
+svg text{fill:var(--ink);font-size:12px}
+.node{cursor:pointer}
+.node rect.box{fill:var(--card);stroke:var(--line);stroke-width:1.2}
+.node rect.bar{fill:var(--accent);opacity:.35}
+.node.growing rect.box{stroke:var(--ok);stroke-width:2.2;filter:drop-shadow(0 0 5px var(--ok))}
+.node.fading{opacity:.6}
+.node.unplaced rect.box{stroke-dasharray:4 3}
+.node:hover rect.box{stroke:var(--accent)}
+.role rect{fill:none;stroke:var(--muted);stroke-dasharray:2 3}
+.edge{fill:none;stroke:var(--line);stroke-width:1.4}
+.slider{display:flex;gap:10px;align-items:center;margin:6px 0 10px}
+.slider input{flex:1}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--line)}
+th{color:var(--muted)}
+.ev{max-height:320px;overflow:auto}
+.foot{color:var(--muted);font-size:12.5px;margin-top:10px}
+.pos{color:var(--ok);font-weight:700}.neg{color:var(--bad);font-weight:700}
+.cell{position:relative;min-width:84px}.cell i{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);opacity:.7}
+.grow{outline:2px solid var(--ok);outline-offset:-2px}
+.minis{display:grid;gap:12px;grid-template-columns:1fr}@media (min-width:860px){.minis{grid-template-columns:1fr 1fr}}
+.cmprow{display:flex;gap:14px;flex-wrap:wrap;margin:6px 0}.cmprow label{display:flex;gap:6px;align-items:center}
+a.btn{text-decoration:none;display:inline-block;color:var(--ink)}
+.legend{font-size:12px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Org Chart X-Ray</h1>
+  <div class="sub">Rebuild a rival's org chart from public hiring data. <span id="cfg" class="pill">checking...</span></div>
+</header>
+
+<section class="card">
+  <h2>Request</h2>
+  <textarea id="req">Which teams at Groww are growing fastest, and what does it say about what they will invest in next?</textarea>
+  <div class="row">
+    <input type="text" id="company" placeholder="Company (optional override, or a website)" style="max-width:340px">
+    <button class="btn primary" id="go">Run</button>
+    <button class="btn" id="resume" disabled>Resume last run</button>
+    <button class="btn" id="last">Load last saved run</button>
+    <label class="sub"><input type="checkbox" id="offline"> offline fixtures</label>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Steps <span id="runmeta" class="sub"></span></h2>
+  <ul class="steps" id="steps"></ul>
+  <div id="stepwarn"></div>
+</section>
+
+<div id="result" hidden>
+  <section class="card" id="briefcard"></section>
+  <section class="card" id="seniorcard"></section>
+  <section class="card" id="exitscard" hidden></section>
+  <section class="card">
+    <h2>Why the numbers differ from a naive count</h2>
+    <div class="legend"><span><i class="sw" style="background:var(--accent)"></i>external joiners (hires)</span>
+      <span><i class="sw" style="background:var(--idle)"></i>re-recorded roles (excluded)</span></div>
+    <div id="dedupe"></div>
+    <div class="sub" id="dedupeNote"></div>
+  </section>
+  <section class="card">
+    <h2>Org tree: external joiners by team</h2>
+    <div class="slider"><span class="sub">Window start</span><input type="range" id="slide" min="0" max="0" value="0"><b id="slideLbl"></b></div>
+    <div class="legend"><span><i class="sw" style="background:var(--ok)"></i>growing</span>
+      <span>faded = fading</span><span>dashed = no department in data</span><span>dotted = open roles (from titles)</span>
+      <span>click a box to see the people</span></div>
+    <div id="tree"></div>
+  </section>
+  <div class="grid two">
+    <section class="card"><h2>Headcount (weekly series)</h2><div id="hc"></div><div class="sub" id="hcNote"></div></section>
+    <section class="card"><h2>Evidence <span class="sub" id="evTitle"></span></h2><div class="ev" id="ev"><span class="sub">Click a [F#] chip or a team box.</span></div></section>
+  </div>
+  <div class="foot" id="foot"></div>
+</div>
+
+<section class="card" id="cmpcard">
+  <h2>Compare rivals <span class="sub">(uses saved runs, no credits)</span></h2>
+  <div id="cmpList" class="sub">No saved runs yet. Run two or more companies first.</div>
+  <div class="row"><button class="btn primary" id="cmpGo" disabled>Compare selected</button></div>
+  <div id="cmpOut"></div>
+</section>
+</div>
+
+<dialog id="dlg" style="border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);width:min(680px,92vw)">
+  <b id="dlgTitle">Draft</b>
+  <textarea id="dlgText" readonly style="min-height:300px;font:12.5px/1.45 ui-monospace,Consolas,monospace"></textarea>
+  <div class="row"><button class="btn primary" id="dlgCopy">Copy</button><button class="btn" id="dlgClose">Close</button></div>
+</dialog>
+
+<script>
+"use strict";
+var STEPS = ["parse","resolve","context","people","jobs","exits","analyse","brief"];
+var $ = function(id){ return document.getElementById(id); };
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+var R = null, lastRun = null, es = null;
+
+fetch("/api/config").then(function(r){return r.json();}).then(function(c){
+  var el = $("cfg");
+  el.textContent = (c.offline ? "offline fixtures" : "live data") + (c.has_model_key ? " + model brief" : " + template brief");
+  el.className = "pill " + (c.has_crustdata_key || c.offline ? "ok" : "bad");
+  if(!c.has_crustdata_key && !c.offline){ el.textContent = "no CRUSTDATA_KEY set"; }
+  $("offline").checked = !!c.offline;
+}).catch(function(){ $("cfg").textContent = "server not reachable"; });
+
+function resetSteps(){
+  $("steps").innerHTML = STEPS.map(function(s){
+    return '<li id="s-'+s+'"><span class="dot" id="d-'+s+'"></span><span class="sname">'+s+'</span><span class="smsg" id="m-'+s+'"></span></li>';
+  }).join("");
+  $("stepwarn").innerHTML = "";
+}
+resetSteps();
+
+function setStep(step, cls, msg){
+  var d = $("d-"+step); if(!d) return;
+  d.className = "dot "+cls; if(msg!=null) $("m-"+step).textContent = msg;
+}
+function addWarn(msg){
+  var b = $("stepwarn"); var p = document.createElement("div"); p.className = "warnbox"; p.textContent = msg; b.appendChild(p);
+}
+
+function start(){
+  var body = {request: $("req").value, company: $("company").value, offline: $("offline").checked};
+  resetSteps(); $("result").hidden = true; $("go").disabled = true;
+  fetch("/api/run",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)})
+    .then(function(r){return r.json();}).then(function(j){
+      if(j.error){ addWarn(j.error); $("go").disabled = false; return; }
+      lastRun = j.run_id; watch(j.run_id);
+    });
+}
+function watch(id){
+  if(es) es.close();
+  $("runmeta").textContent = "run "+id; $("resume").disabled = true;
+  es = new EventSource("/api/stream/"+id);
+  es.onmessage = function(m){
+    var ev = JSON.parse(m.data), d = ev.data, k = ev.kind;
+    if(k==="step_start") setStep(d.step,"running","working...");
+    else if(k==="step_done") setStep(d.step,"done",d.message+(d.seconds!=null?"  ("+d.seconds+"s)":""));
+    else if(k==="step_skipped") setStep(d.step,"skipped",d.message);
+    else if(k==="progress") setStep(d.step,"running",d.message);
+    else if(k==="warning") addWarn(d.message);
+    else if(k==="error"){ setStep(d.step,"failed",d.message); addWarn(d.hint||""); $("resume").disabled=false; }
+    else if(k==="needs_input"){ setStep(d.step,"needs_input",d.message); addWarn("Needs your input: "+d.message); }
+  };
+  es.addEventListener("end", function(){
+    es.close(); $("go").disabled = false;
+    fetch("/api/run/"+id).then(function(r){return r.json();}).then(function(run){
+      if(run.status==="done") render(run.result); else if(run.status==="failed") $("resume").disabled=false;
+    });
+  });
+  es.onerror = function(){ /* the browser retries; the server closes after the end event */ };
+}
+$("go").onclick = start;
+$("resume").onclick = function(){
+  if(!lastRun) return; resetSteps(); $("resume").disabled = true;
+  fetch("/api/resume/"+lastRun,{method:"POST"}).then(function(){ watch(lastRun); });
+};
+$("last").onclick = function(){
+  fetch("/api/last").then(function(r){return r.json();}).then(function(j){
+    if(j.error){ addWarn(j.error); return; }
+    lastRun = j.id; $("runmeta").textContent = "saved run "+j.id; render(j.result);
+  });
+};
+
+/* ---------------- rendering ---------------- */
+function sumTo(obj, months, mi){ var t=0; for(var i=0;i<=mi;i++){ t += (obj && obj[months[i]]) || 0; } return t; }
+
+function render(res){
+  R = res; $("result").hidden = false;
+  var a = res.analysis, months = a.window.months;
+  // brief
+  var b = res.brief, h = '<h2>Decision brief <span class="pill">'+esc(b.generated_by)+'</span></h2>';
+  h += '<p class="headline">'+esc(b.headline)+'</p>';
+  if(b.inference){ h += '<div class="inf"><b>Inference ('+esc(b.inference.confidence)+' confidence):</b> '+esc(b.inference.text)+
+      (b.inference.basis_fact_ids||[]).map(chip).join("")+'</div>'; }
+  h += b.findings.map(function(f){ return '<div class="finding">'+esc(f.text)+(f.fact_ids||[]).map(chip).join("")+'</div>'; }).join("");
+  if(b.actions && b.actions.length){ h += '<h2 style="margin-top:14px">What to do</h2><ul>'+b.actions.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul>'; }
+  h += '<h2 style="margin-top:14px">What we removed or cannot see</h2><ul class="warnbox">'+b.caveats.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul>';
+  $("briefcard").innerHTML = h;
+  document.querySelectorAll("#briefcard .chip").forEach(function(c){ c.onclick = function(){ showFact(c.getAttribute("data-f")); }; });
+
+  drawDedupe(a, months);
+  var sl = $("slide"); sl.max = months.length-1; sl.value = months.length-1;
+  sl.oninput = function(){ drawTree(); drawHc(); };
+  drawTree(); drawHc();
+  renderSenior(a); renderExits(a); exportBar(); loadCompanies();
+  $("foot").textContent = "Credits this run: "+res.credits+" | API calls: "+res.api_calls+" | cached responses reused: "+res.cache_hits+
+    " | "+res.seconds+"s"+(res.offline?" | offline fixtures":"");
+}
+function chip(id){ return '<button class="chip" data-f="'+esc(id)+'">'+esc(id)+'</button>'; }
+
+function drawDedupe(a, months){
+  var ext = a.monthly.external, rel = a.monthly.relisted, W=900, H=150, pad=22;
+  var mx = Math.max.apply(null, months.map(function(m){return (ext[m]||0)+(rel[m]||0);}).concat([1]));
+  var bw = (W-2*pad)/months.length, s = "";
+  months.forEach(function(m,i){
+    var e = ext[m]||0, r = rel[m]||0, x = pad+i*bw+4, w = bw-8;
+    var he = (H-40)*e/mx, hr = (H-40)*r/mx;
+    s += '<rect x="'+x+'" y="'+(H-22-he)+'" width="'+w+'" height="'+he+'" fill="var(--accent)" rx="2"><title>'+m+': '+e+' external</title></rect>';
+    s += '<rect x="'+x+'" y="'+(H-22-he-hr)+'" width="'+w+'" height="'+hr+'" fill="var(--idle)" rx="2"><title>'+m+': '+r+' re-recorded</title></rect>';
+    s += '<text x="'+(x+w/2)+'" y="'+(H-8)+'" text-anchor="middle" style="font-size:10px">'+m.slice(2)+'</text>';
+    if(e+r>0) s += '<text x="'+(x+w/2)+'" y="'+(H-26-he-hr)+'" text-anchor="middle" style="font-size:10px">'+(e+r)+'</text>';
+  });
+  $("dedupe").innerHTML = '<svg viewBox="0 0 '+W+' '+H+'">'+s+'</svg>';
+  var c = a.counts;
+  $("dedupeNote").textContent = "A naive count would say "+c.in_window+" joiners. "+c.relisted+" of them already had an earlier role at this company that ended within "+
+    a.thresholds.relist_gap_days+" days, so they are re-recorded roles. Real external hires: "+c.external+".";
+}
+
+var selected = null;
+function drawTree(){
+  var a = R.analysis, months = a.window.months, mi = +$("slide").value;
+  $("slideLbl").textContent = "until "+months[mi];
+  var depts = a.depts.map(function(d){ return {d:d, n:sumTo(d.monthly, months, mi)}; })
+    .filter(function(x){return x.n>0;}).sort(function(x,y){return y.n-x.n;}).slice(0,9);
+  var maxN = Math.max.apply(null, depts.map(function(x){return x.n;}).concat([1]));
+  var roles = (a.open_roles && a.open_roles.by_dept) || {};
+  var y = 14, nodes = "", edges = "", rootY = 0, DW=230, X0=14, X1=250, X2=610, RW=150;
+  var rows = [];
+  depts.forEach(function(x, idx){
+    var subs = [];
+    if(idx<4){
+      subs = x.d.sub.filter(function(s){return s.name.charAt(0)!=="(";}).map(function(s){return {s:s, n:sumTo(s.monthly, months, mi)};})
+        .filter(function(s){return s.n>0;}).slice(0,3);
+    }
+    var h = Math.max(46, subs.length*30);
+    rows.push({x:x, subs:subs, y:y, h:h}); y += h + 12;
+  });
+  var H = Math.max(y, 120);
+  var total = depts.reduce(function(t,x){return t+x.n;},0);
+  rootY = H/2;
+  nodes += '<g><rect x="'+X0+'" y="'+(rootY-30)+'" width="'+RW+'" height="60" rx="10" fill="var(--accent)"/>'+
+    '<text x="'+(X0+RW/2)+'" y="'+(rootY-4)+'" text-anchor="middle" style="fill:#fff;font-weight:700;font-size:14px">'+esc(R.company.name)+'</text>'+
+    '<text x="'+(X0+RW/2)+'" y="'+(rootY+14)+'" text-anchor="middle" style="fill:#fff;font-size:11px">'+total+' hires shown</text></g>';
+  rows.forEach(function(r){
+    var d = r.x.d, cy = r.y + r.h/2, cls = "node"+(d.momentum.label==="growing"?" growing":d.momentum.label==="fading"?" fading":"")+(d.name==="Unplaced"?" unplaced":"");
+    edges += '<path class="edge" d="M'+(X0+RW)+' '+rootY+' C '+(X0+RW+50)+' '+rootY+' '+(X1-50)+' '+cy+' '+X1+' '+cy+'"/>';
+    var bw = Math.max(6, (DW-12)*r.x.n/maxN);
+    nodes += '<g class="'+cls+'" data-dept="'+esc(d.name)+'"><rect class="box" x="'+X1+'" y="'+(cy-22)+'" width="'+DW+'" height="44" rx="8"/>'+
+      '<rect class="bar" x="'+(X1+6)+'" y="'+(cy+12)+'" width="'+bw+'" height="5" rx="2"/>'+
+      '<text x="'+(X1+10)+'" y="'+(cy-4)+'" style="font-weight:600">'+esc(d.name.length>26?d.name.slice(0,25)+"…":d.name)+'</text>'+
+      '<text x="'+(X1+DW-10)+'" y="'+(cy-4)+'" text-anchor="end" style="font-weight:700">'+r.x.n+'</text>'+
+      '<title>'+esc(d.name)+': '+r.x.n+' external joiners; '+esc(d.momentum.label)+' (last 6m '+d.momentum.last6+' vs '+d.momentum.prev+')</title></g>';
+    if(roles[d.name]){
+      nodes += '<g class="role"><rect x="'+(X1+DW+10)+'" y="'+(cy-11)+'" width="86" height="22" rx="6"/>'+
+        '<text x="'+(X1+DW+53)+'" y="'+(cy+4)+'" text-anchor="middle" style="font-size:11px">'+roles[d.name]+' open</text></g>';
+    }
+    r.subs.forEach(function(s, i){
+      var sy = r.y + i*30 + 14;
+      edges += '<path class="edge" d="M'+(X1+DW+(roles[d.name]?96:0))+' '+cy+' C '+(X2-40)+' '+cy+' '+(X2-40)+' '+sy+' '+X2+' '+sy+'"/>';
+      nodes += '<g class="node'+(s.s.unreliable?' unplaced':'')+'" data-dept="'+esc(d.name)+'" data-sub="'+esc(s.s.name)+'"><title>'+esc(s.s.unreliable?'Unreliable label: '+s.s.unreliable:s.s.name)+'</title><rect class="box" x="'+X2+'" y="'+(sy-13)+'" width="270" height="26" rx="6"/>'+
+        '<text x="'+(X2+8)+'" y="'+(sy+4)+'">'+esc(s.s.name.length>32?s.s.name.slice(0,31)+"…":s.s.name)+'</text>'+
+        '<text x="'+(X2+262)+'" y="'+(sy+4)+'" text-anchor="end" style="font-weight:700">'+s.n+'</text></g>';
+    });
+  });
+  $("tree").innerHTML = '<svg viewBox="0 0 900 '+H+'">'+edges+nodes+'</svg>';
+  document.querySelectorAll("#tree .node").forEach(function(g){
+    g.onclick = function(){ showGroup(g.getAttribute("data-dept"), g.getAttribute("data-sub")); };
+  });
+}
+
+function drawHc(){
+  var hc = R.analysis.headcount, months = R.analysis.window.months, mi = +$("slide").value;
+  if(!hc || !hc.timeseries || !hc.timeseries.length){ $("hc").textContent = "no headcount series"; return; }
+  var ts = hc.timeseries, W=520, H=200, p=34;
+  var vals = ts.map(function(t){return t.employee_count;}), mn = Math.min.apply(null,vals), mx = Math.max.apply(null,vals);
+  var pts = ts.map(function(t,i){ return [p+(W-2*p)*i/(ts.length-1), H-26-(H-56)*(t.employee_count-mn)/Math.max(1,mx-mn)]; });
+  var endOfMonth = months[mi]+"-31", k = 0;
+  ts.forEach(function(t,i){ if(t.date<=endOfMonth) k=i; });
+  var s = '<polyline fill="none" stroke="var(--accent)" stroke-width="2" points="'+pts.map(function(q){return q[0].toFixed(1)+","+q[1].toFixed(1);}).join(" ")+'"/>';
+  s += '<line x1="'+pts[k][0]+'" x2="'+pts[k][0]+'" y1="10" y2="'+(H-26)+'" stroke="var(--ink)" stroke-dasharray="3 3"/>';
+  s += '<circle cx="'+pts[k][0]+'" cy="'+pts[k][1]+'" r="4" fill="var(--accent)"/>';
+  s += '<text x="'+Math.min(pts[k][0]+6, W-120)+'" y="22" style="font-weight:700">'+format(vals[k])+' on '+ts[k].date+'</text>';
+  s += '<text x="'+p+'" y="'+(H-8)+'">'+ts[0].date+'</text><text x="'+(W-p)+'" y="'+(H-8)+'" text-anchor="end">'+ts[ts.length-1].date+'</text>';
+  $("hc").innerHTML = '<svg viewBox="0 0 '+W+' '+H+'">'+s+'</svg>';
+  $("hcNote").textContent = hc.conflict ? "Note: the company record's size range ("+hc.range+") disagrees with this series ("+format(hc.total)+"). The series is used." :
+    "Latest point "+hc.last_date+".";
+}
+function format(n){ return Number(n).toLocaleString(); }
+
+function personRows(ids, maxMonth){
+  var ev = R.analysis.evidence, out = [];
+  ids.forEach(function(id){ var e = ev[String(id)]; if(e && (!maxMonth || e.s.slice(0,7) <= maxMonth)) out.push(e); });
+  return '<table><tr><th>Person</th><th>Role</th><th>Started</th><th>Before</th><th></th></tr>'+out.slice(0,80).map(function(e){
+    return '<tr><td>'+esc(e.n)+'</td><td>'+esc(e.t)+'</td><td>'+esc(e.s)+'</td><td>'+esc(e.p||"-")+'</td><td>'+(e.k==="returning"?'<span class="pill warn">returning</span>':"")+'</td></tr>';
+  }).join("")+'</table>'+(out.length>80?'<div class="sub">first 80 of '+out.length+'</div>':"");
+}
+function showFact(id){
+  var f = R.facts.filter(function(x){return x.id===id;})[0]; if(!f) return;
+  $("evTitle").textContent = "· "+id;
+  $("ev").innerHTML = '<p>'+esc(f.text)+'</p><p class="sub">Source: '+esc(f.source)+'</p>'+(f.evidence.length?personRows(f.evidence):'<div class="sub">This fact is a count over the whole result; no single list of people.</div>');
+}
+function showGroup(dept, sub){
+  var d = R.analysis.depts.filter(function(x){return x.name===dept;})[0]; if(!d) return;
+  var months = R.analysis.window.months, mm = months[+$("slide").value];
+  var ids = d.evidence, label = dept;
+  if(sub){ var s = d.sub.filter(function(x){return x.name===sub;})[0]; if(s){ ids = s.evidence; label = sub+" ("+dept+")"; } }
+  var extra = d.top_prev.length && !sub ? '<p class="sub">Most common previous employers: '+d.top_prev.map(function(p){return esc(p.name)+" ("+p.n+")";}).join(", ")+'</p>' : "";
+  $("evTitle").textContent = "· "+label;
+  $("ev").innerHTML = extra + personRows(ids, mm);
+}
+
+/* ---------------- senior hires radar ---------------- */
+function renderSenior(a){
+  var sn = a.senior || {list:[], counts:{}}, el = $("seniorcard"), c = sn.counts || {};
+  var head = '<h2>Senior hires radar <span class="sub">Director, VP and C-level who joined in the window</span></h2>';
+  if(!sn.list.length){ el.innerHTML = head+'<div class="sub">No senior hires found in the window.</div>'; return; }
+  var sub = ["CXO","Vice President","Director"].filter(function(k){return c[k];}).map(function(k){
+    return c[k]+" "+k+(c[k]>1 && k!=="CXO" ? "s" : ""); }).join(" · ");
+  el.innerHTML = head+'<div class="sub" style="margin-bottom:6px">'+esc(sub)+'. A new senior leader says more about direction than a dozen junior hires.</div>'+
+    '<table><tr><th>Level</th><th>Title</th><th>Name</th><th>Joined</th><th>Came from</th></tr>'+
+    sn.list.slice(0,12).map(function(s){ return '<tr><td>'+esc(s.level)+'</td><td>'+esc(s.title)+'</td><td>'+esc(s.name)+'</td><td>'+esc(s.start)+'</td><td>'+esc(s.prev||"-")+'</td></tr>'; }).join("")+
+    '</table>'+(sn.list.length>12 ? '<div class="sub">first 12 of '+sn.list.length+'</div>' : "");
+}
+
+/* ---------------- exits and net change ---------------- */
+function renderExits(a){
+  var ex = a.exits, el = $("exitscard");
+  if(!ex){ el.hidden = true; return; }
+  el.hidden = false;
+  var months = a.window.months, W=900, H=200, pad=24, mid=96;
+  var mx = Math.max.apply(null, months.map(function(m){return Math.max(ex.monthly[m].hires, ex.monthly[m].exits);}).concat([1]));
+  var bw = (W-2*pad)/months.length, s = '<line x1="'+pad+'" x2="'+(W-pad)+'" y1="'+mid+'" y2="'+mid+'" stroke="var(--line)"/>';
+  months.forEach(function(m,i){
+    var h = ex.monthly[m].hires, e = ex.monthly[m].exits, x = pad+i*bw+3, w = bw-6;
+    var hh = (mid-18)*h/mx, eh = (H-mid-32)*e/mx;
+    s += '<rect x="'+x+'" y="'+(mid-hh)+'" width="'+w+'" height="'+hh+'" fill="var(--accent)" rx="2"><title>'+m+': '+h+' hires</title></rect>';
+    s += '<rect x="'+x+'" y="'+mid+'" width="'+w+'" height="'+eh+'" fill="var(--bad)" opacity=".75" rx="2"><title>'+m+': '+e+' left</title></rect>';
+    if(h) s += '<text x="'+(x+w/2)+'" y="'+(mid-hh-3)+'" text-anchor="middle" style="font-size:10px">'+h+'</text>';
+    if(e) s += '<text x="'+(x+w/2)+'" y="'+(mid+eh+11)+'" text-anchor="middle" style="font-size:10px">'+e+'</text>';
+    s += '<text x="'+(x+w/2)+'" y="'+(H-6)+'" text-anchor="middle" style="font-size:10px">'+m.slice(2)+'</text>';
+  });
+  var nets = ex.net_by_dept.filter(function(x){return x.dept!=="Unplaced";}).slice(0,10);
+  var netTbl = '<table><tr><th>Team (by job-title keywords)</th><th>Hires</th><th>Left</th><th>Net</th></tr>'+nets.map(function(x){
+    return '<tr><td>'+esc(x.dept)+'</td><td>'+x.hires+'</td><td>'+x.exits+'</td><td class="'+(x.net>0?'pos':x.net<0?'neg':'')+'">'+(x.net>0?'+':'')+x.net+'</td></tr>'; }).join("")+'</table>';
+  var dest = '<table><tr><th>Where leavers went</th><th>People</th></tr>'+ex.destinations.slice(0,8).map(function(d){
+    return '<tr><td>'+esc(d.name)+'</td><td>'+d.n+'</td></tr>'; }).join("")+'</table>';
+  var sl = ex.senior_leavers.length ? '<div class="sub" style="margin-top:8px"><b>Senior leavers:</b> '+ex.senior_leavers.slice(0,6).map(function(x){
+    return esc(x.title)+(x.to?' (now '+esc(x.to)+')':''); }).join("; ")+'</div>' : "";
+  el.innerHTML = '<h2>Who left, and net change</h2>'+
+    '<div style="font-size:16px;margin-bottom:6px"><b>'+a.counts.external+'</b> real hires · <b>'+ex.left+'</b> left · net <span class="'+(ex.net_total>=0?'pos':'neg')+'">'+(ex.net_total>0?'+':'')+ex.net_total+'</span>'+
+    ' <span class="sub">(+ '+ex.internal_moves+' people changed role inside the company; median time in the role they left: '+(ex.median_tenure_months==null?'n/a':ex.median_tenure_months+' months')+')</span></div>'+
+    '<div class="legend"><span><i class="sw" style="background:var(--accent)"></i>hires (up)</span><span><i class="sw" style="background:var(--bad)"></i>exits (down)</span></div>'+
+    '<svg viewBox="0 0 '+W+' '+H+'">'+s+'</svg><div class="minis"><div>'+netTbl+'</div><div>'+dest+'</div></div>'+sl+
+    '<div class="sub" style="margin-top:6px">Net is hires minus exits among profiles we can match. It is a rough guide, not a headcount: recent exits and hires are both under-counted, and teams for exits come from job-title keywords.</div>';
+}
+
+/* ---------------- export ---------------- */
+function openDlg(title, text){
+  $("dlgTitle").textContent = title; $("dlgText").value = text;
+  var d = $("dlg"); if(d.showModal) d.showModal(); else d.setAttribute("open","");
+  $("dlgText").focus(); $("dlgText").select();
+}
+$("dlgClose").onclick = function(){ var d=$("dlg"); if(d.close) d.close(); else d.removeAttribute("open"); };
+$("dlgCopy").onclick = function(){
+  $("dlgText").select();
+  try{ document.execCommand("copy"); $("dlgCopy").textContent="Copied"; setTimeout(function(){$("dlgCopy").textContent="Copy";},1200); }catch(e){}
+};
+function exportBar(){
+  var id = lastRun; if(!id) return;
+  var bar = $("exportBar");
+  if(!bar){ bar = document.createElement("div"); bar.id = "exportBar"; bar.className = "row"; $("briefcard").appendChild(bar); }
+  bar.innerHTML = '<a class="btn" href="/api/export/'+id+'?format=md">Download brief (.md)</a>'+
+    '<a class="btn" target="_blank" href="/api/export/'+id+'?format=html">Printable one-pager</a>'+
+    '<button class="btn" id="emailBtn">Draft email to the strategy lead</button><span class="sub">drafts only, nothing is sent</span>';
+  $("emailBtn").onclick = function(){
+    fetch("/api/export/"+id+"?format=email").then(function(r){return r.text();}).then(function(t){ openDlg("Email draft (not sent)", t); });
+  };
+}
+
+/* ---------------- compare rivals ---------------- */
+function loadCompanies(){
+  fetch("/api/companies").then(function(r){return r.json();}).then(function(list){
+    var el = $("cmpList");
+    if(!list.length){ el.textContent = "No saved runs yet. Run two or more companies first."; $("cmpGo").disabled = true; return; }
+    el.innerHTML = '<div class="cmprow">'+list.map(function(c){
+      return '<label><input type="checkbox" class="cmpck" value="'+esc(c.run_id)+'"'+(c.has_exits?' checked':'')+'> '+esc(c.name)+
+        ' <span class="sub">('+c.external+' hires'+(c.has_exits?', with exits':', no exits data')+')</span></label>'; }).join("")+'</div>';
+    var upd = function(){ $("cmpGo").disabled = document.querySelectorAll(".cmpck:checked").length < 2; };
+    document.querySelectorAll(".cmpck").forEach(function(c){ c.onchange = upd; }); upd();
+  }).catch(function(){});
+}
+$("cmpGo").onclick = function(){
+  var ids = Array.prototype.map.call(document.querySelectorAll(".cmpck:checked"), function(c){return c.value;});
+  fetch("/api/compare?ids="+ids.join(",")).then(function(r){return r.json();}).then(renderCompare);
+};
+function pc(x){ return Math.round(100*x)+"%"; }
+function renderCompare(o){
+  var out = $("cmpOut");
+  if(o.error){ out.textContent = o.error; return; }
+  var cs = o.companies;
+  var h = '<table style="margin-top:10px"><tr><th>Company</th><th>People</th><th>Real hires</th><th>Hires / people</th><th>Pace (last 6m vs before)</th><th>Left</th><th>Net</th><th>Senior hires</th></tr>'+
+    cs.map(function(c){
+      return '<tr><td><b>'+esc(c.name)+'</b></td><td>'+(c.headcount!=null?format(c.headcount):"-")+'</td><td>'+c.external+'</td><td>'+(c.intensity!=null?c.intensity+'%':"-")+
+        '</td><td>'+c.pace.last6+' vs '+c.pace.prev+' <span class="sub">'+esc(c.pace.label)+'</span></td><td>'+(c.left!=null?c.left:"-")+
+        '</td><td class="'+(c.net>0?'pos':c.net<0?'neg':'')+'">'+(c.net!=null?(c.net>0?'+':'')+c.net:"-")+'</td><td>'+c.senior+'</td></tr>'; }).join("")+'</table>';
+  var maxShare = 0.001; o.matrix.forEach(function(r){ r.cells.forEach(function(c){ if(c.share>maxShare) maxShare=c.share; }); });
+  h += '<h2 style="margin-top:16px">Where each company is hiring <span class="sub">(count and share of its real hires; green outline = growing)</span></h2>'+
+    '<table><tr><th>Team</th>'+cs.map(function(c){return '<th>'+esc(c.name)+'</th>';}).join("")+'</tr>'+
+    o.matrix.map(function(r){ return '<tr><td>'+esc(r.dept)+'</td>'+r.cells.map(function(c){
+      return '<td class="cell'+(c.label==="growing"?' grow':'')+'">'+c.n+' <span class="sub">'+pc(c.share)+'</span><i style="width:'+Math.round(100*c.share/maxShare)+'%"></i></td>'; }).join("")+'</tr>'; }).join("")+'</table>';
+  if(o.flows.length){
+    h += '<h2 style="margin-top:16px">Talent moving between these companies</h2><table><tr><th>From</th><th>To</th><th>Hired by the second (previous employer)</th><th>Left the first (current employer)</th></tr>'+
+      o.flows.map(function(f){ return '<tr><td>'+esc(f.from)+'</td><td>'+esc(f.to)+'</td><td>'+f.hired_side+'</td><td>'+f.exit_side+'</td></tr>'; }).join("")+'</table>';
+  }
+  if(o.shared_feeders.length){
+    h += '<h2 style="margin-top:16px">Shared talent sources</h2><div class="sub">'+o.shared_feeders.slice(0,8).map(function(f){
+      return '<b>'+esc(f.name)+'</b> '+Object.keys(f.by).map(function(k){return esc(k)+' '+f.by[k];}).join(", "); }).join(" · ")+'</div>';
+  }
+  h += '<h2 style="margin-top:16px">What stands out</h2><ul>'+o.insights.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul>'+
+    '<ul class="warnbox">'+o.caveats.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul>';
+  out.innerHTML = h;
+}
+loadCompanies();
+</script>
+</body>
+</html>
