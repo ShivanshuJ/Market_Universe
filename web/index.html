@@ -79,6 +79,18 @@ th{color:var(--muted)}
 .minis{display:grid;gap:12px;grid-template-columns:1fr}@media (min-width:860px){.minis{grid-template-columns:1fr 1fr}}
 .cmprow{display:flex;gap:14px;flex-wrap:wrap;margin:6px 0}.cmprow label{display:flex;gap:6px;align-items:center}
 a.btn{text-decoration:none;display:inline-block;color:var(--ink)}
+.hero{background:linear-gradient(135deg,var(--accent-soft),var(--card) 70%);border:1px solid var(--line);border-radius:16px;padding:20px 22px;margin-top:14px}
+.hero .kicker{font-size:12px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.tldr{font-size:22px;line-height:1.35;font-weight:700;margin:0 0 8px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:16px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.tile b{display:block;font-size:30px;line-height:1.1;font-variant-numeric:tabular-nums}
+.tile span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.tile small{display:block;font-size:12px;color:var(--muted);margin-top:3px}
+.tile.wide{grid-column:span 2}
+.heat text{font-size:11px}
+.heat .lab{font-size:12px}
+.flownet text{font-size:12px}
 .legend{font-size:12px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap}
 .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 </style>
@@ -109,6 +121,11 @@ a.btn{text-decoration:none;display:inline-block;color:var(--ink)}
 </section>
 
 <div id="result" hidden>
+  <section class="hero" id="hero"></section>
+  <section class="card" id="heatcard">
+    <h2>When each team ramped <span class="sub">(real external hires per month; darker = more)</span></h2>
+    <div id="heat"></div>
+  </section>
   <section class="card" id="briefcard"></section>
   <section class="card" id="seniorcard"></section>
   <section class="card" id="exitscard" hidden></section>
@@ -243,6 +260,7 @@ function render(res){
   var sl = $("slide"); sl.max = months.length-1; sl.value = months.length-1;
   sl.oninput = function(){ drawTree(); drawHc(); };
   drawTree(); drawHc();
+  renderHero(res); renderHeat(a);
   renderSenior(a); renderExits(a); exportBar(); loadCompanies();
   $("foot").textContent = "Credits this run: "+res.credits+" | API calls: "+res.api_calls+" | cached responses reused: "+res.cache_hits+
     " | "+res.seconds+"s"+(res.offline?" | offline fixtures":"");
@@ -368,7 +386,8 @@ function renderSenior(a){
   var sub = ["CXO","Vice President","Director"].filter(function(k){return c[k];}).map(function(k){
     return c[k]+" "+k+(c[k]>1 && k!=="CXO" ? "s" : ""); }).join(" · ");
   el.innerHTML = head+'<div class="sub" style="margin-bottom:6px">'+esc(sub)+'. A new senior leader says more about direction than a dozen junior hires.</div>'+
-    '<table><tr><th>Level</th><th>Title</th><th>Name</th><th>Joined</th><th>Came from</th></tr>'+
+    seniorTimeline(a)+'<div class="legend"><span><i class="sw" style="background:var(--bad);border-radius:50%"></i>C-level</span><span><i class="sw" style="background:var(--accent);border-radius:50%"></i>VP</span><span><i class="sw" style="background:var(--ok);border-radius:50%"></i>Director</span><span>hover a dot for title and previous employer</span></div>'+
+    '<table style="margin-top:8px"><tr><th>Level</th><th>Title</th><th>Name</th><th>Joined</th><th>Came from</th></tr>'+
     sn.list.slice(0,12).map(function(s){ return '<tr><td>'+esc(s.level)+'</td><td>'+esc(s.title)+'</td><td>'+esc(s.name)+'</td><td>'+esc(s.start)+'</td><td>'+esc(s.prev||"-")+'</td></tr>'; }).join("")+
     '</table>'+(sn.list.length>12 ? '<div class="sub">first 12 of '+sn.list.length+'</div>' : "");
 }
@@ -454,6 +473,7 @@ function renderCompare(o){
       return '<tr><td><b>'+esc(c.name)+'</b></td><td>'+(c.headcount!=null?format(c.headcount):"-")+'</td><td>'+c.external+'</td><td>'+(c.intensity!=null?c.intensity+'%':"-")+
         '</td><td>'+c.pace.last6+' vs '+c.pace.prev+' <span class="sub">'+esc(c.pace.label)+'</span></td><td>'+(c.left!=null?c.left:"-")+
         '</td><td class="'+(c.net>0?'pos':c.net<0?'neg':'')+'">'+(c.net!=null?(c.net>0?'+':'')+c.net:"-")+'</td><td>'+c.senior+'</td></tr>'; }).join("")+'</table>';
+  h += flowNet(o);
   var maxShare = 0.001; o.matrix.forEach(function(r){ r.cells.forEach(function(c){ if(c.share>maxShare) maxShare=c.share; }); });
   h += '<h2 style="margin-top:16px">Where each company is hiring <span class="sub">(count and share of its real hires; green outline = growing)</span></h2>'+
     '<table><tr><th>Team</th>'+cs.map(function(c){return '<th>'+esc(c.name)+'</th>';}).join("")+'</tr>'+
@@ -470,6 +490,117 @@ function renderCompare(o){
   h += '<h2 style="margin-top:16px">What stands out</h2><ul>'+o.insights.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul>'+
     '<ul class="warnbox">'+o.caveats.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul>';
   out.innerHTML = h;
+}
+/* ---------------- hero: one sentence, big numbers ---------------- */
+function countUp(el, to, dec){
+  var t0 = null;
+  function step(ts){
+    if(t0 === null) t0 = ts;
+    var p = Math.min(1, (ts - t0) / 700), v = to * (1 - Math.pow(1 - p, 3));
+    el.textContent = dec ? v.toFixed(dec) : Math.round(v).toLocaleString();
+    if(p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+function renderHero(res){
+  var a = res.analysis, b = res.brief, c = a.counts, hc = a.headcount, om = a.overall_momentum, ex = a.exits;
+  var sn = (a.senior && a.senior.list) || [], months = a.window.months, ext = a.monthly.external;
+  var mx = Math.max.apply(null, months.map(function(m){return ext[m]||0;}).concat([1]));
+  var spark = '<svg viewBox="0 0 300 46" style="height:46px">'+months.map(function(m,i){
+    var v = ext[m]||0, h = 4 + 38*v/mx, w = 300/months.length;
+    return '<rect x="'+(i*w+2)+'" y="'+(46-h)+'" width="'+(w-4)+'" height="'+h+'" rx="2" fill="var(--accent)" opacity="'+(0.35+0.65*v/mx)+'"><title>'+m+': '+v+' hires</title></rect>';
+  }).join("")+'</svg>';
+  var paceCls = om.label==="growing" ? "pos" : om.label==="fading" ? "neg" : "";
+  var tiles = [];
+  tiles.push('<div class="tile"><span>Real hires</span><b data-count="'+c.external+'">0</b><small>'+c.in_window+' raw "joiners", '+c.relisted+' re-recorded removed</small></div>');
+  if(hc && hc.total) tiles.push('<div class="tile"><span>Hiring intensity</span><b data-count="'+(100*c.external/hc.total).toFixed(1)+'" data-dec="1">0</b><small>% of headcount ('+format(hc.total)+')</small></div>');
+  tiles.push('<div class="tile"><span>Pace</span><b class="'+paceCls+'" style="font-size:22px;padding-top:6px">'+esc(om.label.indexOf("not comparable")===0 ? "capped" : om.label)+'</b><small>'+om.last6+' in the last 6 months vs '+om.prev+' before</small></div>');
+  tiles.push('<div class="tile"><span>Senior hires</span><b data-count="'+sn.length+'">0</b><small>Director, VP and C-level</small></div>');
+  if(ex) tiles.push('<div class="tile"><span>People who left</span><b data-count="'+ex.left+'">0</b><small>+ '+ex.internal_moves+' moved inside the company</small></div>');
+  if(a.open_roles && a.open_roles.total_reported) tiles.push('<div class="tile"><span>Open postings</span><b data-count="'+a.open_roles.total_reported+'">0</b><small>across job sources</small></div>');
+  tiles.push('<div class="tile wide"><span>Real hires by month</span>'+spark+'</div>');
+  var by = (b.generated_by||"").indexOf("model")===0 ? "model-written, every number checked against the facts" : "written by code from the computed facts";
+  var conf = b.inference ? ' <span class="pill '+(b.inference.confidence==="high"?"ok":b.inference.confidence==="medium"?"warn":"bad")+'">'+esc(b.inference.confidence)+' confidence</span>' : "";
+  $("hero").innerHTML = '<div class="kicker">'+esc(res.company.name)+' · '+esc(a.window.start)+' to '+esc(a.window.end)+'</div>'+
+    '<p class="tldr">'+esc(b.tldr || b.headline)+'</p>'+
+    '<div class="sub">Summary '+esc(by)+'.'+conf+'</div><div class="tiles">'+tiles.join("")+'</div>';
+  document.querySelectorAll("#hero [data-count]").forEach(function(el){
+    countUp(el, parseFloat(el.getAttribute("data-count")), el.getAttribute("data-dec") ? 1 : 0);
+  });
+}
+
+/* ---------------- heatmap: when each team ramped ---------------- */
+function renderHeat(a){
+  var months = a.window.months, rows = a.depts.filter(function(d){return d.name!=="Unplaced";}).slice(0,9);
+  if(!rows.length){ $("heat").innerHTML = '<div class="sub">No team data.</div>'; return; }
+  var W = 900, labW = 210, totW = 46, cw = (W-labW-totW)/months.length, ch = 27, top = 24, H = top + rows.length*ch + 6;
+  var mx = 1; rows.forEach(function(d){ months.forEach(function(m){ mx = Math.max(mx, d.monthly[m]||0); }); });
+  var s = "";
+  months.forEach(function(m,i){ s += '<text x="'+(labW+i*cw+cw/2)+'" y="14" text-anchor="middle" style="fill:var(--muted)">'+m.slice(2)+'</text>'; });
+  rows.forEach(function(d,r){
+    var y = top + r*ch;
+    var dot = d.momentum.label==="growing" ? '<circle cx="8" cy="'+(y+ch/2-1)+'" r="4" fill="var(--ok)"/>' : "";
+    s += dot+'<text class="lab" x="20" y="'+(y+ch/2+3)+'">'+esc(d.name.length>27 ? d.name.slice(0,26)+"…" : d.name)+'</text>';
+    months.forEach(function(m,i){
+      var n = d.monthly[m]||0, op = n ? 0.12+0.88*n/mx : 0;
+      s += '<rect x="'+(labW+i*cw+1)+'" y="'+(y+1)+'" width="'+(cw-2)+'" height="'+(ch-2)+'" rx="4" fill="'+(n?'var(--accent)':'var(--bg)')+'" fill-opacity="'+(n?op:1)+'"><title>'+esc(d.name)+' · '+m+': '+n+' hires</title></rect>';
+      if(n) s += '<text x="'+(labW+i*cw+cw/2)+'" y="'+(y+ch/2+3)+'" text-anchor="middle" style="fill:'+(op>0.6?'#fff':'var(--ink)')+'">'+n+'</text>';
+    });
+    s += '<text x="'+(W-4)+'" y="'+(y+ch/2+3)+'" text-anchor="end" style="font-weight:700">'+d.external+'</text>';
+  });
+  $("heat").innerHTML = '<svg class="heat" viewBox="0 0 '+W+' '+H+'">'+s+'</svg>'+
+    '<div class="legend" style="margin-top:6px"><span><i class="sw" style="background:var(--ok);border-radius:50%"></i>growing team</span><span>hover a cell for the count</span><span>right column = total real hires</span></div>';
+}
+
+/* ---------------- senior hires timeline ---------------- */
+function seniorTimeline(a){
+  var sn = (a.senior && a.senior.list) || []; if(!sn.length) return "";
+  var W = 900, H = 112, pad = 30, t0 = new Date(a.window.start).getTime(), t1 = new Date(a.window.end).getTime();
+  var yBy = {"CXO":24, "Vice President":54, "Director":84}, col = {"CXO":"var(--bad)", "Vice President":"var(--accent)", "Director":"var(--ok)"};
+  var s = "";
+  Object.keys(yBy).forEach(function(k){ s += '<line x1="'+pad+'" x2="'+(W-pad)+'" y1="'+yBy[k]+'" y2="'+yBy[k]+'" stroke="var(--line)"/><text x="2" y="'+(yBy[k]+4)+'" style="font-size:10px;fill:var(--muted)">'+(k==="Vice President"?"VP":k)+'</text>'; });
+  sn.forEach(function(p){
+    var x = pad + 18 + (new Date(p.start).getTime()-t0)/(t1-t0)*(W-2*pad-18);
+    s += '<circle cx="'+x+'" cy="'+yBy[p.level]+'" r="7" fill="'+col[p.level]+'" fill-opacity=".85"><title>'+esc(p.title)+' · joined '+esc(p.start)+(p.prev?' · from '+esc(p.prev):'')+'</title></circle>';
+  });
+  a.window.months.forEach(function(m,i){ if(i%2===0){ var x = pad + 18 + (i/(a.window.months.length-1))*(W-2*pad-18); s += '<text x="'+x+'" y="'+(H-4)+'" text-anchor="middle" style="font-size:10px;fill:var(--muted)">'+m.slice(2)+'</text>'; } });
+  return '<svg viewBox="0 0 '+W+' '+H+'" style="margin:4px 0 8px">'+s+'</svg>';
+}
+
+/* ---------------- talent-flow network between rivals ---------------- */
+function flowNet(o){
+  var cs = o.companies; if(cs.length < 2) return "";
+  var W = 700, H = 400, cx = W/2, cy = H/2 - 6, R = Math.min(W,H)/2 - 82;
+  var maxH = Math.max.apply(null, cs.map(function(c){return c.headcount||0;}).concat([1]));
+  var pos = {}, inn = {}, out = {};
+  cs.forEach(function(c,i){
+    var ang = -Math.PI/2 + 2*Math.PI*i/cs.length;
+    pos[c.name] = {x: cx + R*Math.cos(ang), y: cy + R*Math.sin(ang), r: 16 + 26*Math.sqrt((c.headcount||0)/maxH), c: c};
+  });
+  o.flows.forEach(function(f){ var w = Math.max(f.hired_side, f.exit_side); out[f.from] = (out[f.from]||0) + w; inn[f.to] = (inn[f.to]||0) + w; });
+  var s = '<defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>';
+  o.flows.forEach(function(f){
+    var A = pos[f.from], B = pos[f.to], w = Math.max(f.hired_side, f.exit_side); if(!A || !B || !w) return;
+    var dx = B.x-A.x, dy = B.y-A.y, len = Math.sqrt(dx*dx+dy*dy) || 1, ux = dx/len, uy = dy/len;
+    var sx = A.x+ux*A.r, sy = A.y+uy*A.r, ex = B.x-ux*(B.r+7), ey = B.y-uy*(B.r+7);
+    var off = (f.from < f.to ? 1 : -1) * 34, qx = (sx+ex)/2 - uy*off, qy = (sy+ey)/2 + ux*off;
+    s += '<path d="M'+sx+' '+sy+' Q'+qx+' '+qy+' '+ex+' '+ey+'" fill="none" stroke="var(--muted)" stroke-opacity=".75" stroke-width="'+(1.5+Math.min(w,8)*1.3)+'" marker-end="url(#arr)"><title>'+esc(f.from)+' to '+esc(f.to)+': '+f.hired_side+' by the hiring side, '+f.exit_side+' by the exit side</title></path>';
+    var mx = (sx+2*qx+ex)/4, my = (sy+2*qy+ey)/4;
+    s += '<rect x="'+(mx-17)+'" y="'+(my-9)+'" width="34" height="18" rx="9" fill="var(--card)" stroke="var(--line)"/><text x="'+mx+'" y="'+(my+4)+'" text-anchor="middle" style="font-weight:700">'+f.hired_side+' / '+f.exit_side+'</text>';
+  });
+  cs.forEach(function(c){
+    var p = pos[c.name], net = (inn[c.name]||0) - (out[c.name]||0);
+    var fill = net > 0 ? "var(--ok-soft)" : net < 0 ? "var(--bad-soft)" : "var(--card)", stroke = net > 0 ? "var(--ok)" : net < 0 ? "var(--bad)" : "var(--line)";
+    var vx = p.x - cx, vy = p.y - cy, vl = Math.sqrt(vx*vx + vy*vy) || 1, lx = p.x + vx/vl*(p.r+30), ly = p.y + vy/vl*(p.r+26);
+    s += '<circle cx="'+p.x+'" cy="'+p.y+'" r="'+p.r+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="2.5"/>'+
+      '<text x="'+p.x+'" y="'+(p.y+4)+'" text-anchor="middle" style="font-weight:700">'+(net>0?'+':'')+net+'</text>'+
+      '<text x="'+lx+'" y="'+ly+'" text-anchor="middle" style="font-weight:700;font-size:13px">'+esc(c.name)+'</text>'+
+      '<text x="'+lx+'" y="'+(ly+14)+'" text-anchor="middle" style="fill:var(--muted);font-size:11px">'+(c.headcount?format(c.headcount)+' people':'')+'</text>';
+  });
+  return '<h2 style="margin-top:16px">Talent flow between these rivals</h2>'+
+    '<div class="sub">An arrow means people moved from the first company to the second. The label is counted two independent ways: <b>hiring side / exit side</b>. '+
+    'The number inside a circle is net talent gained (green) or lost (red) among these rivals; circle size is headcount.</div>'+
+    '<svg class="flownet" viewBox="0 0 '+W+' '+H+'" style="max-width:700px;margin:6px auto 0">'+s+'</svg>';
 }
 loadCompanies();
 </script>
