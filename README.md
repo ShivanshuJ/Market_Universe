@@ -1,0 +1,100 @@
+# Org Chart X-Ray
+
+**An agent that rebuilds a rival's org chart from public hiring data and tells a strategy team where they are investing, with every number sourced.**
+
+Built overnight at ContextCon 04, IIT Kanpur (theme: Services, Replaced), on Crustdata's people, company and job data.
+
+## The service
+- **The job it replaces:** competitive-intelligence research. Someone on a strategy or corporate-development team (or a consultant on a competitor study) opens profiles one by one, copies titles into a spreadsheet, guesses which team each person is on, and repeats it next quarter. It is slow, so it is done for one or two rivals a year and goes stale.
+- **Who pays today:** strategy and corp-dev teams at fintechs, banks and funds, and consulting firms that sell competitor studies. We did not research current fees, so this README makes no price claim.
+- **A customer request:** "Which teams at Groww are growing fastest, and what does it say about what they will invest in next?" The finished work is a one-page brief with sources, plus the evidence behind each number.
+
+## What it does now
+1. Reads the request and resolves the company to one record. Ambiguity stops the run and asks (25 records are literally named "Groww"; "Groww Inc" is a different 2-10 person company; typos are accepted but flagged as assumed).
+2. Pulls everyone whose current role started in the last 12 months (Person Search), the headcount series and leaders (Company Enrich), and open roles (Job Search).
+3. **Removes re-recorded roles.** Between a quarter and a half of "recent joiners" already worked at the company (promotions, restructures). Counting them doubles the hiring number and invents a spike. Groww: 419 raw, 217 real.
+4. Groups real hires by team, sub-team, previous employer and month. Growth labels use documented thresholds and switch off when the sample is capped.
+5. Writes a decision brief. Every number is a **fact with an id and a source**; click-through shows the people behind it. A model may reword the brief, but a number that is not in the facts makes it fall back to the template brief.
+6. **Senior hires radar:** Director, VP and C-level joiners, newest first, with where they came from.
+7. **Who left, and net change:** people whose role here ended (minus those who still hold a role here, i.e. promotions), where they went, and hires minus exits per month and per team. The app flags when net disagrees with the headcount series.
+8. **Compare rivals:** saved runs side by side (hiring intensity, team mix, pace, exits, senior hires) plus talent that moved between the rivals, matched by company id. The hiring side and the exit side give two independent counts of each flow, and they agreed (Cashfree to Groww 3 and 3, Cashfree to CRED 2 and 2).
+9. **Export:** brief as markdown, a printable one-pager, and an email draft to the strategy lead (drafts only, nothing is sent).
+10. Everything is saved per step: kill the process and `resume` continues without repeating paid calls.
+
+**Where a person is still needed:** when a company name is ambiguous or unknown, the run stops and asks. Interpreting the brief and deciding what to do is left to the strategy team, by design.
+
+## Architecture
+```mermaid
+flowchart TB
+  Q["Request in customer words"] --> P
+  subgraph Pipeline["Pipeline: every step is saved, and resume skips finished steps"]
+    direction TB
+    P[parse] --> R["resolve<br/>Crustdata Company Identify"]
+    R --> C["context<br/>Crustdata Company Enrich"]
+    C --> PE["people<br/>Crustdata Person Search: recent joiners"]
+    PE --> J["jobs<br/>Crustdata Job Search"]
+    J --> X["exits<br/>Crustdata Person Search: roles that ended"]
+    X --> A["analyse<br/>code only, no model"]
+    A --> F["facts<br/>id + source + people behind each number"]
+    F --> B["brief<br/>template, or a model rewrite that is checked"]
+  end
+  R -- "ambiguous or unknown" --> H["ask a person"]
+  B --> UI["UI, rival comparison, export"]
+  Pipeline -.-> DB[("SQLite: response cache,<br/>step outputs, events")]
+```
+- `app/crustdata.py`: client with 429 retry using `x-ratelimit-reset`, 5xx/timeout backoff, 402 stop, response cache, credit budget guard.
+- `app/store.py`: SQLite for cache, runs, per-step outputs and the event stream the UI reads.
+- `app/analysis.py`: no network, no model; all thresholds are constants at the top and are echoed in the output.
+- `app/brief.py`: facts with ids/sources, template brief, optional model rewrite verified against the facts.
+- `app/compare.py`, `app/export.py`: rival comparison and the exports. `web/index.html`: the UI.
+- State lives in `data/xray.db` (git-ignored). No third-party packages; runs on any machine with Python 3.
+
+**Where it calls Crustdata:** Company Identify (free), Company Enrich (2 credits), Person Search (about 0.23 credits per person with experience), Job Search (0.03 per posting; category counts over all postings are free).
+
+**Models:** none are required. With `ANTHROPIC_API_KEY` set, a model rewrites the brief from the computed facts and is rejected if it invents a number or cites a missing fact. The numbers in this README and the demo come from the template brief, i.e. from code.
+
+## How to run
+```bash
+cp .env.example .env        # then put your CRUSTDATA_KEY in .env (never commit it)
+python -m app.server        # open http://localhost:8000
+```
+Offline demo fallback (no network, no credits): `XRAY_OFFLINE=1 python -m app.server`
+
+Command line:
+```bash
+python -m app.cli run "Which teams at Groww are growing fastest?" [--offline]
+python -m app.cli run "..." --crash-after people     # simulates a crash after a step
+python -m app.cli resume RUN_ID                      # continues, skipping finished steps
+python -m unittest discover -s tests -v              # 31 tests, no network
+```
+
+## Approaches we considered
+1. **Pull every employee and group titles ourselves, or use Crustdata's normalized departments?** Pulling everyone is expensive and title grouping is noisy. We use the normalized departments (present for 73% to 92% of joiners) and guard against their weak spot: a team made of one vague title ("Assistant Manager") is flagged and left out of conclusions.
+2. **Count everyone whose current role started recently, or dedupe re-recorded roles?** The naive count was wrong by up to 2x (and created a fake April spike), so we dedupe with a documented gap rule and show both numbers side by side in the UI.
+3. **Company-level headcount series only, or person-level hires?** The series is cheap but has no previous employer, seniority or team detail. We use person-level data for the analysis and the series as a cross-check, and we say when they disagree.
+4. **Let a model read profiles and write the analysis, or compute in code and let a model only reword?** Computing in code makes every number reproducible and sourceable. The model is optional and cannot add numbers.
+5. **Live monitoring (Watchers) or a snapshot?** A snapshot is what a one-off competitor question needs and works in the demo. Watchers are the obvious next step (see below).
+6. **Net change from the headcount series, or hires minus exits?** We compute both. Hires minus exits explains who moved where; the series is a sanity check.
+
+## What worked / what did not
+- **Worked:** normalized departments; sorting by start date; the weekly headcount series; cached responses (re-running a company costs 0 credits); exits via a same-entry filter (company id and end date on the same role); the two independent counts of talent flow agreeing.
+- **Did not:** counting raw recent starts; trusting sub-department labels blindly (10 Cashfree "Assistant Managers" were tagged Retail Store Management); comparing halves of the window on a capped pull (a newest-first sample fakes growth); resolving "Groww Inc" or "Cashfree Payments" by exact name alone; the company record's open-job count (1 for Groww) against Job Search (296).
+- **Honest weakness:** per-team net change uses job-title keywords for exits, and hires minus exits can disagree in sign with the headcount series (Groww, CRED). We show it as a rough guide.
+
+## Hardest case
+Re-recorded roles inflating hiring, then name ambiguity ("Groww Inc" silently matched a tiny company before we added the check), then capped samples faking growth, then net change disagreeing with the headcount series. Each is handled in code, shown in the UI, and covered by a test.
+
+## How we tested
+31 unit tests (`tests/test_core.py`) plus live runs on three companies, a live crash-and-resume, a messy-input check, and a hand check of 20 classified people. Results with numbers are in `tests/RESULTS.md`. No backtest yet (see below).
+
+## What we left out to ship in eight hours
+Reporting lines (not in the data), contractors, per-team baselines against the previous year, a backtest against a known past event, live monitoring, and a model-written brief run end to end (the code path is tested, but we ran with the template brief).
+
+## What next, and why not now
+- **Backtest:** run the agent as of a past date and check whether it flagged a move that later became public. Not now: needs a trustworthy past event and a date-bounded data pull we could not verify in a night.
+- **Watchers:** alert when a team's pace or a senior hire crosses a threshold. Not now: alerts take days to fire, so we could not demo or test them tonight.
+- **Previous-year baseline per team:** so "growing" means growing against normal. Not now: doubles credit cost per company.
+- **Better exit teams:** classify what a leaver did before leaving, not by keywords. Not now: needs a title taxonomy we did not have time to build.
+
+## The future of this service
+Once agents do the whole job, the org chart stops being a report and becomes a living dataset: every rival, every team, refreshed continuously, with alerts when a rival hires a new head of a function, builds a team from a specific employer, or starts losing a team. The strategy team stops asking and starts being told, and the judgement call that remains (what to do about it) stays with a person.
