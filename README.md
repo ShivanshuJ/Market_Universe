@@ -23,6 +23,31 @@ Built overnight at ContextCon 04, IIT Kanpur (theme: Services, Replaced), on Cru
 
 **Where a person is still needed:** when a company name is ambiguous or unknown, the run stops and asks. Interpreting the brief and deciding what to do is left to the strategy team, by design.
 
+## Claim Court: what makes this different
+Other tools show you what the data says. X-Ray puts each claim on trial and shows which ones survive (`app/court.py`).
+Each claim is a thing a straightforward tool would tell you, attacked with checks built from traps we hit in real data:
+
+| Attack | Real example from our runs |
+|---|---|
+| Re-recorded roles | Groww: 419 raw "joiners" are 217 real hires; the "April spike" of 181 was 50 |
+| Rule sensitivity | The answer is the same at a 60, 120 or 180-day rule, or the page says it is not |
+| Profile lag | "Fading" pace that turns "steady" once the latest month is ignored |
+| Conflicting sources | Net change -44 against a headcount series that moved +297; size "501-1000" against 3,155; 1 open job against 296 |
+| Mis-tagged titles | Ten Cashfree "Assistant Managers" tagged as a retail team; assistants tagged "CXO" |
+| Missing labels | Whether unlabelled hires could change which team ranks first |
+| Coverage | 2,119 profiles for about 3,155 people, so the true count may be up to about 323 |
+| Intern conversions | 53 of Groww's re-recorded roles are interns who became full-time, shown as a generous reading |
+
+A claim ends **killed**, **weakened** or **survived**. The page leads with what was killed and a naive-vs-audited table.
+It also records **dated, checkable calls** (headcount band, job-postings floor), fixed by a content hash the moment a run
+finishes, and checks the method against the company's own history (trend rule vs "nothing changes").
+`python -m app.cli score` scores calls whose date has passed against fresh data. Nothing has been scored yet.
+A model, if a key is set, may only reword; the verdicts come from code.
+
+**The interface is a deck of flip cards** (`web/cards.js`, `web/cards.css`, no libraries): every headline number flips to show how it is computed,
+every finding flips to its source and the people behind it, and the court is a 3D deck you move through with the arrow keys, flip with Space
+and show full screen with P. Names are blurred by default (a toggle reveals them), and motion respects the reduced-motion setting.
+
 ## Architecture
 ```mermaid
 flowchart TB
@@ -35,7 +60,8 @@ flowchart TB
     PE --> J["jobs<br/>Crustdata Job Search"]
     J --> X["exits<br/>Crustdata Person Search: roles that ended"]
     X --> A["analyse<br/>code only, no model"]
-    A --> F["facts<br/>id + source + people behind each number"]
+    A --> CT["claim court<br/>every claim attacked, verdicts and predictions"]
+    CT --> F["facts<br/>id + source + people behind each number"]
     F --> B["brief<br/>template, or a model rewrite that is checked"]
   end
   R -- "ambiguous or unknown" --> H["ask a person"]
@@ -65,7 +91,9 @@ Command line:
 python -m app.cli run "Which teams at Groww are growing fastest?" [--offline]
 python -m app.cli run "..." --crash-after people     # simulates a crash after a step
 python -m app.cli resume RUN_ID                      # continues, skipping finished steps
-python -m unittest discover -s tests -v              # 31 tests, no network
+python -m unittest discover -s tests -v              # 50 tests, no network
+python -m app.cli predictions                        # the dated calls on the record
+python -m app.cli score                              # score calls whose date has passed
 ```
 
 ## Approaches we considered
