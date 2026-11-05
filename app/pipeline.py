@@ -10,10 +10,11 @@ import time
 import uuid
 
 from . import analysis, brief
+from . import court as courtmod
 from .config import settings
 from .crustdata import BudgetExceeded, Client, CrustdataError, OutOfCredits
 
-STEPS = ["parse", "resolve", "context", "people", "jobs", "exits", "analyse", "brief"]
+STEPS = ["parse", "resolve", "context", "people", "jobs", "exits", "analyse", "court", "brief"]
 RANGE_RANK = {"1": 0, "2-10": 1, "11-50": 2, "51-200": 3, "201-500": 4, "501-1000": 5, "1001-5000": 6,
               "5001-10000": 7, "10001+": 8}
 STOP = {"which", "what", "who", "show", "tell", "find", "how", "where", "when", "is", "are", "the", "a", "an", "i",
@@ -237,7 +238,13 @@ def step_people(ctx):
             truncated = True
             ctx["emit"]("warning", {"message": "Stopping the people pull: not enough credit budget left for another page."})
             break
-    return {"people": people, "total_reported": total, "truncated": truncated, "pages": pages,
+    profiles_total = None  # everyone on record who works here now: lets the court state how complete our counts are
+    try:
+        profiles_total = cl.call("/person/search", {"filters": {"field": "experience.employment_details.current.company_id", "type": "=", "value": cid},
+                                                    "fields": ["basic_profile"], "limit": 1}).get("total_count")
+    except CrustdataError:
+        pass
+    return {"people": people, "total_reported": total, "truncated": truncated, "pages": pages, "current_profiles": profiles_total,
             "message": "Pulled %d people with a current role starting on/after %s (reported total %s)%s" % (
                 len(people), ws, total, " [capped]" if truncated else "")}
 
@@ -304,7 +311,8 @@ def step_analyse(ctx):
     a = analysis.analyze(o["people"]["people"], ctx["run"]["params"]["window_start"], dt.date.today(),
                          company=o["context"]["company"], jobs=o["jobs"]["jobs"],
                          pulled_total=o["people"]["total_reported"], truncated=o["people"]["truncated"],
-                         leavers=ex.get("leavers"), exits_truncated=bool(ex.get("truncated")))
+                         leavers=ex.get("leavers"), exits_truncated=bool(ex.get("truncated")),
+                         current_profiles=o["people"].get("current_profiles"))
     c = a["counts"]
     if a.get("open_roles") is not None:
         a["open_roles"]["categories"] = o["jobs"].get("categories") or []
@@ -315,23 +323,33 @@ def step_analyse(ctx):
         c["external"], c["relisted"], c["returning"], c["unplaced"])}
 
 
+def step_court(ctx):
+    """Put every claim on trial. Pure code over what the earlier steps saved."""
+    o = ctx["out"]
+    ct = courtmod.run_court(o["analyse"]["analysis"], o["people"]["people"], ctx["run"]["params"]["window_start"], dt.date.today(),
+                            company=o["context"]["company"], resolve=o["resolve"], jobs_total=o["jobs"].get("total_reported"))
+    s = ct["summary"]
+    return {"court": ct, "message": "Claim Court: %d claims tried: %d killed, %d weakened, %d survived" % (s["tried"], s["killed"], s["weakened"], s["survived"])}
+
+
 def step_brief(ctx):
     s, o = settings(), ctx["out"]
     co = o["resolve"]["company"]
     a = o["analyse"]["analysis"]
-    facts = brief.build_facts(co["name"], a, co["id"])
+    ct = (o.get("court") or {}).get("court")
+    facts = brief.build_facts(co["name"], a, co["id"], ct)
     b, why = (None, "no model key")
     if s["anthropic_key"]:
         b, why = brief.llm_brief(co["name"], a, facts, s["anthropic_key"], s["model"])
     note = None
     if b is None:
-        b = brief.template_brief(co["name"], a, facts)
+        b = brief.template_brief(co["name"], a, facts, ct)
         note = "template brief used (%s)" % why
     return {"brief": b, "facts": facts, "message": "Brief written: %s%s" % (b["generated_by"], " - " + note if note else "")}
 
 
 FUNCS = {"parse": step_parse, "resolve": step_resolve, "context": step_context, "people": step_people,
-         "jobs": step_jobs, "exits": step_exits, "analyse": step_analyse, "brief": step_brief}
+         "jobs": step_jobs, "exits": step_exits, "analyse": step_analyse, "court": step_court, "brief": step_brief}
 
 
 # ------------------------------------------------------------------ runner
@@ -382,10 +400,16 @@ def execute(store, run_id):
             os._exit(3)
 
     co = out["resolve"]["company"]
+    made = dt.date.today().isoformat()
+    court_out = out["court"]["court"]
+    for p in court_out["predictions"]:
+        p["hash"] = courtmod.prediction_hash(co["id"], made, p)  # the call is fixed by its hash from this moment
+    store.add_predictions(run_id, co["id"], co["name"], made, court_out["predictions"])
     result = {"company": {**co, "alternates": out["resolve"]["alternates"],
                           "enrich": {k: v for k, v in out["context"]["company"].items() if k != "headcount"}},
               "request": run["request"], "window": out["analyse"]["analysis"]["window"],
-              "analysis": out["analyse"]["analysis"], "brief": out["brief"]["brief"], "facts": out["brief"]["facts"],
+              "analysis": out["analyse"]["analysis"], "court": court_out,
+              "brief": out["brief"]["brief"], "facts": out["brief"]["facts"],
               "warnings": out["analyse"]["analysis"]["warnings"],
               "credits": round(client.spent, 2), "api_calls": client.calls, "cache_hits": client.cache_hits,
               "seconds": round(time.time() - t0, 1), "offline": bool(run["params"].get("offline"))}

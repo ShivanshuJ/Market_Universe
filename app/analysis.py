@@ -138,8 +138,10 @@ def slim_jobs(listings, today):
 
 
 # ------------------------------------------------------------------ classification
-def classify(person):
-    """'new' | 'returning' | 'relisted'. Uses the earlier same-company roles on the profile."""
+def classify(person, gap=None):
+    """'new' | 'returning' | 'relisted'. Uses the earlier same-company roles on the profile.
+    `gap` (days) is the re-recorded-role threshold; the court re-runs this with other values."""
+    gap = RELIST_GAP_DAYS if gap is None else gap
     start = pdate(person["start"])
     same = [x for x in person["past"] if x.get("cid") == person["cid"]]
     if not same:
@@ -151,7 +153,7 @@ def classify(person):
             gaps.append(0)  # open-ended earlier role: a continuation
         else:
             gaps.append((start - end).days)
-    return "relisted" if min(gaps) <= RELIST_GAP_DAYS else "returning"
+    return "relisted" if min(gaps) <= gap else "returning"
 
 
 def _norm_emp(name):
@@ -169,6 +171,10 @@ def prev_employer(person):
 
 
 SENIOR_LEVELS = {"CXO": 0, "Vice President": 1, "Director": 2}
+INTERN = re.compile(r"\b(intern|internship|trainee|apprentice)\b", re.I)
+# The data tags some assistants, interns and advisors as senior; their titles give them away.
+NOISE_SENIOR = re.compile(r"(executive|personal|admin\w*)\s+assistant|assistant\s+to\b|\bintern\b|trainee|advis[eo]r|"
+                          r"\bto (the )?(ceo|chief|md|managing|chairman|founder)|office of|ceo office|secretary|apprentice", re.I)
 
 
 def slim_leaver(p, cid):
@@ -271,12 +277,16 @@ def momentum(starts, today, capped=False):
 
 # ------------------------------------------------------------------ main analysis
 def analyze(people, window_start, today, company=None, jobs=None, pulled_total=None, truncated=False,
-            leavers=None, exits_truncated=False):
-    """people: slim_person dicts. company: slim_company dict. jobs: slim_jobs list."""
+            leavers=None, exits_truncated=False, gap_days=None, current_profiles=None):
+    """people: slim_person dicts. company: slim_company dict. jobs: slim_jobs list.
+    gap_days overrides the re-recorded-role threshold (used by the court's sensitivity tests)."""
     ws = pdate(window_start)
+    gap = RELIST_GAP_DAYS if gap_days is None else gap_days
     kinds = collections.Counter()
     ext = []  # external joiners (new + returning)
     relisted_by_month = collections.Counter()
+    relisted_examples = []
+    intern_conv = 0
     outside = 0
     multi = 0
     for p in people:
@@ -286,10 +296,17 @@ def analyze(people, window_start, today, company=None, jobs=None, pulled_total=N
             continue
         if p.get("n_current_at_company", 1) > 1:
             multi += 1
-        k = classify(p)
+        k = classify(p, gap)
         kinds[k] += 1
         if k == "relisted":
             relisted_by_month[p["start"][:7]] += 1
+            if INTERN.search(" ".join(x.get("title") or "" for x in p["past"] if x.get("cid") == p["cid"])) and not INTERN.search(p["title"] or ""):
+                intern_conv += 1  # an intern who became full-time: arguably a real new seat
+            if len(relisted_examples) < 150:
+                earlier = [x for x in p["past"] if x.get("cid") == p["cid"]]
+                e = sorted(earlier, key=lambda x: x["end"] or "9999", reverse=True)[0] if earlier else {}
+                relisted_examples.append({"id": p["id"], "n": p["name"], "t": p["title"], "s": p["start"],
+                                          "pt": e.get("title"), "ps": e.get("start"), "pe": e.get("end")})
         else:
             ext.append((p, k))
 
@@ -358,16 +375,22 @@ def analyze(people, window_start, today, company=None, jobs=None, pulled_total=N
             prev_all[key] += 1
             disp_all.setdefault(key, nm)
 
-    senior = []
+    senior, senior_removed = [], []
     for p, k in ext:
         if p.get("seniority") in SENIOR_LEVELS:
             nm, pkey = prev_employer(p)
-            senior.append({"id": p["id"], "name": p["name"], "title": p["title"], "start": p["start"],
-                           "level": p["seniority"], "dept": p["dept"] or UNPLACED, "prev": nm,
-                           "pc": pkey if isinstance(pkey, int) else None, "kind": k})
+            row = {"id": p["id"], "name": p["name"], "title": p["title"], "start": p["start"],
+                   "level": p["seniority"], "dept": p["dept"] or UNPLACED, "prev": nm,
+                   "pc": pkey if isinstance(pkey, int) else None, "kind": k}
+            if NOISE_SENIOR.search(p["title"] or ""):
+                senior_removed.append(row)  # tagged senior by the data, but the title says assistant/intern/advisor
+            else:
+                senior.append(row)
     senior.sort(key=lambda s: s["start"], reverse=True)               # newest first ...
     senior.sort(key=lambda s: SENIOR_LEVELS[s["level"]])              # ... within each level (stable sort)
     senior_counts = collections.Counter(s["level"] for s in senior)
+    senior_audit = {"tagged": len(senior) + len(senior_removed), "kept": len(senior),
+                    "removed": [{"id": r["id"], "title": r["title"], "level": r["level"]} for r in senior_removed][:20]}
     exits = analyze_exits(leavers, window_start, today, ext, exits_truncated) if leavers is not None else None
 
     unplaced_n = len(by_dept.get(UNPLACED, []))
@@ -375,10 +398,10 @@ def analyze(people, window_start, today, company=None, jobs=None, pulled_total=N
     if kinds["relisted"]:
         warnings.append("%d of %d people with a current role starting in the window already had an earlier role at "
                         "this company (gap <= %d days). They look like re-recorded roles, not hires, so they are "
-                        "excluded from joiner counts." % (kinds["relisted"], sum(kinds.values()), RELIST_GAP_DAYS))
+                        "excluded from joiner counts." % (kinds["relisted"], sum(kinds.values()), gap))
     if kinds["returning"]:
         warnings.append("%d joiners are returning ex-employees (earlier role ended more than %d days before). "
-                        "They are counted as hires." % (kinds["returning"], RELIST_GAP_DAYS))
+                        "They are counted as hires." % (kinds["returning"], gap))
     for d in depts:
         for s in d["sub"]:
             if s["unreliable"]:
@@ -444,17 +467,19 @@ def analyze(people, window_start, today, company=None, jobs=None, pulled_total=N
         "counts": {"pulled": len(people), "in_window": sum(kinds.values()), "external": n_ext,
                    "new": kinds["new"], "returning": kinds["returning"], "relisted": kinds["relisted"],
                    "unplaced": unplaced_n, "outside_window": outside,
-                   "pulled_total_reported": pulled_total, "truncated": truncated},
+                   "pulled_total_reported": pulled_total, "truncated": truncated,
+                   "current_profiles": current_profiles, "intern_conversions": intern_conv},
+        "relisted_examples": relisted_examples,
         "monthly": {"external": {m: ext_by_month.get(m, 0) for m in months},
                     "relisted": {m: relisted_by_month.get(m, 0) for m in months}},
         "depts": depts,
         "overall_momentum": momentum([pdate(p["start"]) for p, _ in ext], today, truncated),
         "prev_employers": [{"name": disp_all[k], "n": n, "cid": k if isinstance(k, int) else None}
                            for k, n in prev_all.most_common(40)],
-        "senior": {"counts": dict(senior_counts), "list": senior[:40]},
+        "senior": {"counts": dict(senior_counts), "list": senior[:40], "audit": senior_audit},
         "exits": exits,
         "headcount": hc, "open_roles": open_roles, "evidence": evidence, "warnings": warnings,
-        "thresholds": {"relist_gap_days": RELIST_GAP_DAYS, "momentum_split_days": MOMENTUM_SPLIT_DAYS,
+        "thresholds": {"relist_gap_days": gap, "momentum_split_days": MOMENTUM_SPLIT_DAYS,
                        "min_total_for_label": MIN_TOTAL_FOR_LABEL, "grow_ratio": GROW_RATIO,
                        "fade_ratio": FADE_RATIO},
     }

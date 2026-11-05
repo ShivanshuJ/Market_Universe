@@ -66,6 +66,8 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path)
         path, q = u.path, parse_qs(u.query)
+        if path == "/api/predictions":
+            return self._json(STORE.list_predictions())
         if path == "/api/companies":  # latest finished run per company
             seen = {}
             for r in STORE.list_runs(200):

@@ -375,6 +375,124 @@ class ModelPath(unittest.TestCase):
         self.assertIn(str(self.res["analysis"]["counts"]["external"]), t)
 
 
+RELIST = [{"cid": CID, "name": "Groww", "title": "Analyst", "start": "2023-01-01", "end": "2026-03-15"}]
+
+
+def court_for(people, company=None, **kw):
+    from app import court
+    jobs_total = kw.pop("jobs_total", None)
+    a = analysis.analyze(people, "2025-11-01", TODAY, company=company, **kw)
+    return a, court.run_court(a, people, "2025-11-01", TODAY, company=company, jobs_total=jobs_total)
+
+
+class ClaimCourt(unittest.TestCase):
+    def verdicts(self, ct):
+        return {c["id"]: c["verdict"] for c in ct["claims"]}
+
+    def test_naive_joiner_count_is_killed_when_many_are_rerecorded_roles(self):
+        people = [person(i, "2026-02-01") for i in range(10)] + [person(100 + i, "2026-04-01", past=RELIST) for i in range(10)]
+        _, ct = court_for(people)
+        c1 = [c for c in ct["claims"] if c["id"] == "C1"][0]
+        self.assertEqual(c1["verdict"], "killed")
+        self.assertEqual((c1["naive"]["value"], c1["audited"]["value"]), (20, 10))
+        self.assertIn("20 'joiners' became 10", ct["summary"]["headline_kill"])
+
+    def test_intern_conversions_are_shown_as_a_generous_reading_not_hidden(self):
+        intern = [{"cid": CID, "name": "Groww", "title": "SDE Intern", "start": "2025-08-01", "end": "2026-03-20"}]
+        people = [person(i, "2026-02-01") for i in range(6)] + [dict(person(50 + i, "2026-04-01", past=intern), title="SDE 1") for i in range(4)]
+        a, ct = court_for(people)
+        self.assertEqual(a["counts"]["intern_conversions"], 4)
+        c1 = [c for c in ct["claims"] if c["id"] == "C1"][0]
+        self.assertIn("up to 10", c1["audited"]["note"])
+        self.assertTrue(any(t["name"] == "Intern conversions" for t in c1["tests"]))
+
+    def test_spike_month_made_of_rerecorded_roles_is_killed(self):
+        people = []
+        for m in ("2026-01", "2026-02", "2026-03", "2026-05", "2026-06"):
+            people += [person(len(people) + i, m + "-10") for i in range(4)]
+        people += [person(500 + i, "2026-04-10", past=RELIST) for i in range(30)] + [person(900, "2026-04-10")]
+        _, ct = court_for(people)
+        spikes = [c for c in ct["claims"] if c["id"].startswith("C2")]
+        self.assertTrue(spikes and spikes[0]["verdict"] == "killed")
+        self.assertIn("2026-04", spikes[0]["title"])
+
+    def test_pace_label_is_stable_for_flat_hiring_and_flips_when_last_month_is_dropped(self):
+        from app import court
+        self.assertEqual({court.pace_label([8] * 13, k) for k in (0, 1, 2)}, {"steady"})
+        lagged = [10] * 7 + [6] * 5 + [0]  # only the unfinished last month collapses
+        self.assertEqual((court.pace_label(lagged, 0), court.pace_label(lagged, 1)), ("fading", "steady"))
+
+    def test_assistant_tagged_senior_is_audited_out(self):
+        people = [dict(person(1, "2026-03-01"), seniority="CXO", title="Executive Assistant to Chief Executive Officer"),
+                  dict(person(2, "2026-03-01"), seniority="CXO", title="Chief Financial Officer"),
+                  dict(person(3, "2026-03-01"), seniority="Vice President", title="Assistant Vice President - Risk")]
+        a, ct = court_for(people)
+        self.assertEqual(a["senior"]["audit"], {"tagged": 3, "kept": 2, "removed": [{"id": 1, "title": "Executive Assistant to Chief Executive Officer", "level": "CXO"}]})
+        c6 = [c for c in ct["claims"] if c["id"] == "C6"][0]
+        self.assertEqual(c6["verdict"], "killed" if 1 / 3 >= .25 else "weakened")
+
+    def test_conflicting_size_sources_are_killed_and_coverage_gives_an_upper_bound(self):
+        co = {"range": "501-1000", "headcount": {"total": 3000, "last_date": "2026-11-01", "growth_percent": {}, "by_role": {}, "timeseries": []},
+              "hiring": {"openings_count": 1}}
+        people = [person(i, "2026-03-01") for i in range(10)]
+        a, ct = court_for(people, company=co, jobs_total=296, current_profiles=2000)
+        v = self.verdicts(ct)
+        self.assertEqual((v["C8"], v["C9"], v["C10"]), ("killed", "killed", "weakened"))
+        c10 = [c for c in ct["claims"] if c["id"] == "C10"][0]
+        self.assertEqual(c10["audited"]["value"], round(10 / (2000 / 3000)))
+
+    def test_net_that_contradicts_the_series_is_killed(self):
+        co = {"range": "501-1000", "headcount": {"total": 700, "last_date": "2026-11-01", "growth_percent": {}, "by_role": {},
+              "timeseries": [{"date": "2025-12-01", "employee_count": 500}, {"date": "2026-11-01", "employee_count": 700}]},
+              "hiring": {"openings_count": None}}
+        leavers = [analysis.slim_leaver(raw_leaver(i, "2026-05-01", dest=(5, "X")), CID) for i in range(30)]
+        _, ct = court_for([person(1, "2026-04-01")], company=co, leavers=leavers)
+        self.assertEqual(self.verdicts(ct)["C7"], "killed")
+
+
+class Predictions(unittest.TestCase):
+    def test_hash_is_deterministic_and_changes_with_the_call(self):
+        from app import court
+        p = {"kind": "postings_floor", "due": "2027-01-01", "spec": {"floor": 80}, "statement": "x"}
+        h1 = court.prediction_hash(5, "2026-11-06", p)
+        self.assertEqual(h1, court.prediction_hash(5, "2026-11-06", dict(p)))
+        self.assertNotEqual(h1, court.prediction_hash(5, "2026-11-06", dict(p, spec={"floor": 81})))
+
+    def test_calibration_compares_the_rule_with_no_change(self):
+        from app import court
+        ts = [{"employee_count": 1000 + 20 * i} for i in range(20)]  # steady growth: the trend rule should beat "no change"
+        cal = court.calibrate_headcount(ts)
+        self.assertGreater(cal["windows"], 5)
+        self.assertGreaterEqual(cal["trend_rate"], cal["flat_rate"])
+
+    def test_due_predictions_are_scored_against_fresh_data_and_future_ones_are_left_alone(self):
+        from app import court
+        st = Store(os.path.join(tempfile.mkdtemp(), "p.db"))
+        mk = lambda due, lo, hi: {"kind": "headcount_band", "due": due, "spec": {"lo": lo, "hi": hi}, "statement": "hc " + due}
+        a, b = mk("2026-11-01", 3000, 3200), mk("2099-01-01", 1, 2)
+        for p in (a, b):
+            p["hash"] = court.prediction_hash(7, "2026-09-01", p)
+        st.add_predictions("r", 7, "Co", "2026-09-01", [a, b])
+
+        class Fake:
+            def call(self, path, body, **kw):
+                return [{"matches": [{"company_data": {"headcount": {"timeseries": [{"employee_count": 3100}]}}}]}]
+        out = court.score_due(st, Fake(), TODAY)
+        self.assertEqual([o["status"] for o in out], ["hit"])
+        self.assertEqual({p["status"] for p in st.list_predictions()}, {"hit", "pending"})
+
+    def test_a_full_run_stores_hashed_calls_and_a_court(self):
+        os.environ["XRAY_DB"] = os.path.join(tempfile.mkdtemp(), "c.db")
+        st = Store(os.environ["XRAY_DB"])
+        rid = new_run(st, "Which teams at Groww are growing fastest?", offline=True)
+        self.assertEqual(execute(st, rid), "done")
+        res = st.get_run(rid)["result"]
+        self.assertGreaterEqual(res["court"]["summary"]["killed"], 1)
+        self.assertEqual(len(st.list_predictions()), len(res["court"]["predictions"]))
+        self.assertTrue(all(len(p["id"]) == 64 for p in st.list_predictions()))
+        self.assertIn("X-Ray rejected", res["brief"]["tldr"])
+
+
 class CacheNeverRespends(unittest.TestCase):
     def test_second_identical_call_is_served_from_cache(self):
         tmp = tempfile.mkdtemp()

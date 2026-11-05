@@ -16,6 +16,9 @@ CREATE TABLE IF NOT EXISTS steps(
   PRIMARY KEY(run_id, name));
 CREATE TABLE IF NOT EXISTS events(
   id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, ts REAL, kind TEXT, data TEXT);
+CREATE TABLE IF NOT EXISTS predictions(
+  id TEXT PRIMARY KEY, run_id TEXT, company_id INTEGER, company TEXT, made_at TEXT, due TEXT, kind TEXT,
+  statement TEXT, spec TEXT, status TEXT DEFAULT 'pending', observed REAL, checked_at TEXT);
 """
 
 
@@ -97,6 +100,25 @@ class Store:
     def steps(self, run_id):
         rows = self._all("SELECT name,status,error,started,finished FROM steps WHERE run_id=? ORDER BY started", (run_id,))
         return [dict(r) for r in rows]
+
+    # ---- predictions on the record (id = content hash, so a call cannot be quietly edited or duplicated)
+    def add_predictions(self, run_id, company_id, company, made_at, preds):
+        for p in preds:
+            self._x("INSERT OR IGNORE INTO predictions(id,run_id,company_id,company,made_at,due,kind,statement,spec) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (p["hash"], run_id, company_id, company, made_at, p["due"], p["kind"], p["statement"], json.dumps(p["spec"])))
+
+    def list_predictions(self, company_id=None):
+        sql, args = "SELECT * FROM predictions", ()
+        if company_id:
+            sql, args = sql + " WHERE company_id=?", (company_id,)
+        return [dict(r) for r in self._all(sql + " ORDER BY made_at DESC, due", args)]
+
+    def due_predictions(self, today):
+        return [dict(r) for r in self._all("SELECT * FROM predictions WHERE status='pending' AND due<=?", (today,))]
+
+    def update_prediction(self, pid, status, observed):
+        self._x("UPDATE predictions SET status=?, observed=?, checked_at=? WHERE id=?",
+                (status, observed, time.strftime("%Y-%m-%d"), pid))
 
     # ---- events (the UI streams these)
     def add_event(self, run_id, kind, data):

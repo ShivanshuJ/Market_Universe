@@ -15,7 +15,7 @@ def _pct(x):
     return "%d%%" % round(100 * x)
 
 
-def build_facts(name, a, company_id):
+def build_facts(name, a, company_id, court=None):
     facts = []
 
     def add(text, source, evidence=None):
@@ -31,6 +31,12 @@ def build_facts(name, a, company_id):
             "%s role that ended at most %d days before, so the new entry is a re-recorded role, not a hire."
             % (c["relisted"], name, a["thresholds"]["relist_gap_days"]),
             "Crustdata Person Search: earlier roles at the same company id on the same profile")
+    if court and court["summary"]["tried"]:
+        cs = court["summary"]
+        add("Claim Court tried %d claims: %d killed, %d weakened, %d survived.%s" % (
+            cs["tried"], cs["killed"], cs["weakened"], cs["survived"],
+            (" Killed: " + "; ".join(cs["kills"][:3]) + ".") if cs["kills"] else ""),
+            "X-Ray Claim Court: each claim attacked with the checks listed on the page")
     hc = a.get("headcount")
     if hc and hc.get("total"):
         g = (hc.get("growth_percent") or {}).get("yoy")
@@ -108,7 +114,7 @@ def _top_dept_names(a, n=2):
     return [d for d in a["depts"] if d["name"] != "Unplaced"][:n]
 
 
-def tldr_text(name, a):
+def tldr_text(name, a, court=None):
     """One plain sentence a busy reader can repeat. Built only from computed numbers."""
     c, om = a["counts"], a["overall_momentum"]
     tops = _top_dept_names(a, 2)
@@ -121,10 +127,13 @@ def tldr_text(name, a):
     n_s = len((a.get("senior") or {}).get("list") or [])
     if n_s:
         s += " %d senior leader%s joined." % (n_s, "" if n_s == 1 else "s")
+    if court and court["summary"]["killed"]:
+        cs = court["summary"]
+        s += " X-Ray rejected %d naive claim%s, e.g. %s." % (cs["killed"], "" if cs["killed"] == 1 else "s", cs["headline_kill"] or "see the court")
     return s
 
 
-def template_brief(name, a, facts):
+def template_brief(name, a, facts, court=None):
     fid = {}
     for f in facts:  # map first words to ids so findings can cite them
         fid.setdefault(f["text"].split(":")[0].split(" (")[0][:40], f["id"])
@@ -171,7 +180,7 @@ def template_brief(name, a, facts):
     o = a.get("open_roles")
     if o and o["count_pulled"]:
         actions.append("Compare these hires against the open roles listed (%d found) to see what they are still trying to fill." % o["count_pulled"])
-    return {"headline": head + ".", "tldr": tldr_text(name, a), "findings": findings, "inference": inference,
+    return {"headline": head + ".", "tldr": tldr_text(name, a, court), "findings": findings, "inference": inference,
             "caveats": list(a["warnings"]) + ["Public profile data lags reality by up to 30 days and cannot show reporting lines or internal plans."],
             "actions": actions, "generated_by": "template"}
 

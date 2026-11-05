@@ -33,6 +33,9 @@ def answer(path, body):
     if path == "/company/enrich":
         return _load("groww_enrich.json")
     if path == "/person/search":
+        f = body.get("filters") or {}
+        if f.get("field") == "experience.employment_details.current.company_id" and int(body.get("limit") or 0) == 1:
+            return {"profiles": [], "next_cursor": None, "total_count": 2119}  # live-measured people on record at Groww
         if "employment_details.end_date" in json.dumps(body.get("filters")):
             name = "groww_exits.json"
             if not (FIX / name).exists():

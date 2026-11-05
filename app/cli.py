@@ -31,10 +31,26 @@ def main(argv=None):
     rs.add_argument("run_id")
     sh = sub.add_parser("show")
     sh.add_argument("run_id")
+    sub.add_parser("score", help="check every prediction whose date has passed against fresh data")
+    sub.add_parser("predictions", help="list the calls on the record")
     args = ap.parse_args(argv)
 
     sys.stdout.reconfigure(encoding="utf-8")
     store = Store(settings()["db"])
+    if args.cmd == "predictions":
+        for p in store.list_predictions():
+            print("%s | %-7s | due %s | %s | %s" % (p["id"][:10], p["status"], p["due"], p["company"], p["statement"]))
+        return 0
+    if args.cmd == "score":
+        import datetime as dt
+        from . import court as courtmod
+        from .crustdata import Client
+        s = settings()
+        out = courtmod.score_due(store, Client(s["crustdata_key"], store, budget=s["budget"]), dt.date.today())
+        for r in out:
+            print("%-6s observed %s | %s" % (r["status"].upper(), r["observed"], r["statement"]))
+        print("%d prediction(s) scored" % len(out))
+        return 0
     if args.cmd == "show":
         run = store.get_run(args.run_id)
         print(json.dumps(run["result"] or {"status": run["status"], "error": run["error"]}, indent=1)[:6000])
