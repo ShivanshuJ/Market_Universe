@@ -37,10 +37,32 @@ def new_run(store, request, company=None, offline=None):
 
 
 # ------------------------------------------------------------------ steps
+_NAME = r"(?P<c>[A-Za-z0-9&.'’\-]+(?:\s+[A-Za-z0-9&.'’\-]+){0,4}?)"
+_AFTER = r"(?=\s+(?:are|is|was|were|have|has|hiring|hires|growing|investing|building|doing|and|which|what|how)\b|[?,;:]|\.\s|\.$|\s*$)"
+PHRASES = [
+    re.compile(r"\b(?:at|of|for|about|inside)\s+" + _NAME + _AFTER, re.I),
+    re.compile(r"\bhow\s+" + _NAME + r"\s+(?:is|are)\b", re.I),
+    re.compile(r"\bis\s+" + _NAME + r"\s+(?:investing|hiring|building|doing|growing)\b", re.I),
+]
+
+
+def phrase_company(text):
+    """The company named after 'at / of / how / is', so 'No broker' stays 'No broker' (not 'No')."""
+    for rx in PHRASES:
+        for m in rx.finditer(text):
+            cand = m.group("c").strip(" .,'’-")
+            toks = [t.lower() for t in re.findall(r"[A-Za-z0-9&'.-]+", cand)]
+            if cand and not all(t in STOP for t in toks):
+                return cand
+    return ""
+
+
 def step_parse(ctx):
     req, override = ctx["run"]["request"], ctx["run"]["params"].get("company")
     domain = re.search(r"\b([a-z0-9-]+\.(?:com|in|io|ai|co|org|net|app)(?:\.[a-z]{2})?)\b", req, re.I)
     name = (override or "").strip()
+    if not name and not domain:
+        name = phrase_company(req)
     if not name and not domain:
         words = re.findall(r"[A-Za-z0-9&'.-]+", req)
         cand = []
@@ -95,6 +117,22 @@ def _desc(c):
     return "%s (%s, size %s)" % (c["name"], c["domain"] or "no website", c["range"] or "unknown")
 
 
+# Records that stand for "no company", not a company. Never resolve to these.
+PLACEHOLDERS = {"no company", "no-company", "nocompany", "self employed", "self-employed", "freelance", "freelancer",
+                "independent", "independent consultant", "stealth", "stealth startup", "confidential", "unemployed",
+                "n/a", "na", "none", "private", "student"}
+NEAR_MATCH_MIN = 0.8  # similarity needed to accept a name that is not an exact match
+
+
+def _alnum(s):
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower())
+
+
+def _similar(a, b):
+    import difflib
+    return difflib.SequenceMatcher(None, _alnum(a), _alnum(b)).ratio()
+
+
 def step_resolve(ctx):
     cl, p = ctx["client"], ctx["out"]["parse"]
     q = p["company_query"]
@@ -121,9 +159,15 @@ def step_resolve(ctx):
                 if cands:
                     name = n
                     break
+    cands = [c for c in cands if (c["name"] or "").strip().lower() not in PLACEHOLDERS]
     if not cands:
         raise NeedsHuman("No company matched '%s'. Check the spelling or give its website." % q)
     best, ties = _pick(cands, name)
+    if not p.get("domain") and _alnum(best["name"]) != _alnum(name) and _similar(name, best["name"]) < NEAR_MATCH_MIN:
+        # nothing is named like the request: do not guess, show the closest and ask
+        close = sorted(cands, key=lambda c: (_similar(name, c["name"]), c["rank"]), reverse=True)[:3]
+        raise NeedsHuman("No company is named '%s'. Closest: %s. Give the website to choose."
+                         % (q, ", ".join(_desc(c) for c in close)))
     if ties:
         raise NeedsHuman("'%s' matches several companies of the same size: %s. Give the website to choose."
                          % (q, ", ".join(_desc(c) for c in [best] + ties[:3])))

@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlparse
 from . import export
 from .compare import compare
 from .config import ROOT, settings
-from .pipeline import execute, new_run
+from .pipeline import PLACEHOLDERS, execute, new_run
 from .store import Store
 
 STORE = None
@@ -74,6 +74,8 @@ class H(BaseHTTPRequestHandler):
                 run = STORE.get_run(r["id"])
                 res = run["result"]
                 cid = res["company"]["id"]
+                if (res["company"]["name"] or "").strip().lower() in PLACEHOLDERS:
+                    continue  # saved by an older version that accepted "No-Company" for "No broker"
                 if cid not in seen:
                     seen[cid] = {"run_id": r["id"], "company_id": cid, "name": res["company"]["name"],
                                  "external": res["analysis"]["counts"]["external"], "window": res["window"]["start"],

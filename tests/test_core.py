@@ -197,6 +197,46 @@ class Resolve(unittest.TestCase):
         self.assertEqual(out["company"]["id"], 1)
         self.assertIn("taken to mean", out["assumed"])
 
+    def test_real_incident_no_broker_is_not_read_as_no_and_never_runs_on_a_placeholder(self):
+        from app.pipeline import NeedsHuman, phrase_company, step_resolve
+        # "No broker" (meant NoBroker) used to be read as "No", fuzzy-matched "No-Company" and ran
+        self.assertEqual(phrase_company("Which teams at No broker are growing fastest, and what next?"), "No broker")
+        t = {("no broker", False): [_m(9, "No-Company", "nocompany.no", "10001+")]}
+        with self.assertRaises(NeedsHuman):
+            step_resolve(self.ctx("Which teams at No broker are growing fastest?", t))
+
+    def test_weak_near_match_asks_instead_of_guessing(self):
+        from app.pipeline import NeedsHuman, step_resolve
+        t = {("no broker", False): [_m(9, "Brokerly Holdings", "brokerly.com", "10001+")]}
+        with self.assertRaises(NeedsHuman) as cm:
+            step_resolve(self.ctx("Which teams at No broker are growing fastest?", t))
+        self.assertIn("Give the website", str(cm.exception))
+
+    def test_company_phrase_extraction_on_the_requests_we_have_seen(self):
+        from app.pipeline import phrase_company
+        cases = {
+            "Which teams at Groww are growing fastest, and what does it say about what they will invest in next?": "Groww",
+            "Show me how Cashfree is hiring and which teams are growing": "Cashfree",
+            "What is CRED investing in? Show me which teams are growing.": "CRED",
+            "what is going on at Cashfree Payments Pvt Ltd": "Cashfree Payments Pvt Ltd",
+            "hiring at Acme": "Acme",
+            "Which teams at Optiver are growing fastest and have people graduated from IIT": "Optiver",
+        }
+        for text, want in cases.items():
+            self.assertEqual(phrase_company(text), want, text)
+        self.assertEqual(phrase_company("teams?"), "")
+
+    def test_placeholder_entities_are_never_resolved(self):
+        from app.pipeline import NeedsHuman, step_resolve
+        t = {("freelance", True): [_m(5, "Freelance", "freelance.com", "10001+")]}
+        with self.assertRaises(NeedsHuman):
+            step_resolve(self.ctx("hiring at Freelance", t))
+
+    def test_small_typo_is_still_accepted(self):
+        from app.pipeline import _similar
+        self.assertGreaterEqual(_similar("Gorww", "Groww"), 0.8)
+        self.assertLess(_similar("No broker", "No-Company"), 0.8)
+
     def test_two_equally_big_companies_with_the_same_name_ask_a_human(self):
         from app.pipeline import NeedsHuman, step_resolve
         t = {("acme", True): [_m(1, "ACME", "acme.ua", "11-50"), _m(2, "ACME", "acmefurnace.net", "11-50")]}
@@ -295,6 +335,44 @@ class Export(unittest.TestCase):
         self.assertIn("## Sources", export.render_markdown(res))
         self.assertIn("<h1>", export.render_html(res))
         self.assertIsNotNone(res["analysis"]["exits"])  # offline fixtures now carry exits too
+
+
+class ModelPath(unittest.TestCase):
+    """The model path is exercised with a stand-in for the API (no key needed)."""
+
+    def setUp(self):
+        os.environ["XRAY_DB"] = os.path.join(tempfile.mkdtemp(), "m.db")
+        st = Store(os.environ["XRAY_DB"])
+        rid = new_run(st, "Which teams at Groww are growing fastest?", offline=True)
+        execute(st, rid)
+        self.res = st.get_run(rid)["result"]
+
+    def _reply(self, tldr):
+        f1 = self.res["facts"][0]
+        return json.dumps({"headline": f1["text"], "tldr": tldr,
+                           "findings": [{"text": f1["text"], "fact_ids": [f1["id"]], "confidence": "high"}],
+                           "inference": {"text": "A cautious read.", "confidence": "low", "basis_fact_ids": [f1["id"]]},
+                           "actions": []})
+
+    def test_checked_model_brief_is_accepted(self):
+        from unittest import mock
+        n = self.res["analysis"]["counts"]["external"]
+        with mock.patch.object(brief, "call_model", return_value=self._reply("Groww added %d real hires." % n)):
+            b, why = brief.llm_brief("Groww", self.res["analysis"], self.res["facts"], "k", "m")
+        self.assertIsNone(why)
+        self.assertTrue(b["generated_by"].startswith("model"))
+        self.assertIn(str(n), b["tldr"])
+
+    def test_model_summary_with_an_invented_number_falls_back(self):
+        from unittest import mock
+        with mock.patch.object(brief, "call_model", return_value=self._reply("Groww added 99999 real hires.")):
+            b, why = brief.llm_brief("Groww", self.res["analysis"], self.res["facts"], "k", "m")
+        self.assertIsNone(b)
+        self.assertIn("99999", why)
+
+    def test_template_always_has_a_plain_tldr_built_from_numbers(self):
+        t = self.res["brief"]["tldr"]
+        self.assertIn(str(self.res["analysis"]["counts"]["external"]), t)
 
 
 class CacheNeverRespends(unittest.TestCase):
