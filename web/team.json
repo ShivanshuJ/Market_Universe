@@ -1,0 +1,14 @@
+{
+  "team_name": "",
+  "one_line": "Tell it your company: it finds your rivals, who is heading where you are heading, and who fell, from live hiring data.",
+  "theme": "Services, Replaced",
+  "repo": "",
+  "video": "",
+  "diagram": "",
+  "service": "The competitive-intelligence analyst: the person a company pays to name its rivals, report how they are doing, and warn who is coming.",
+  "approach": "Pure-code analysis over Crustdata (company, people, job, web search). No model decides a number. Every claim shows its evidence and can be attacked by the Claim Court. A model, when a key is present, only words the findings and is checked against them.",
+  "next": "Watchers for change alerts, sector mode, scoring our stored predictions after their due date, and a signed evidence ledger.",
+  "members": [
+    {"name": "Shivanshu Jaiswara", "role": "Builder", "github": ""}
+  ]
+}

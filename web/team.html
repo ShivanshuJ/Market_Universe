@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team and submission</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="/universe.css">
+<link rel="stylesheet" href="/company.css">
+<style>
+.mem{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.mc{border:1px solid var(--line);border-radius:20px;padding:18px;background:linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.015))}
+.mc .av{width:54px;height:54px;border-radius:16px;display:grid;place-items:center;font:700 22px var(--display);color:#04050a;background:linear-gradient(120deg,var(--ok),var(--accent2));margin-bottom:10px}
+.mc h3{margin:0;font:700 22px var(--display)}.mc .r{color:var(--muted);font-size:13px}
+.mc.empty{border-style:dashed;color:var(--muted);display:grid;place-items:center;min-height:150px}
+.st{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.st span{font:11px var(--mono);border-radius:99px;padding:3px 10px;border:1px solid var(--line)}
+.st .ok{color:var(--ok);border-color:var(--ok)}.st .no{color:var(--warn);border-color:var(--warn)}
+.chk{list-style:none;margin:0;padding:0}
+.chk li{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px dashed var(--line);font-size:15px}
+.chk input{width:20px;height:20px;margin-top:2px;accent-color:var(--ok)}
+.chk li.done{color:var(--muted);text-decoration:line-through}
+.field{display:grid;grid-template-columns:150px 1fr;gap:12px;padding:10px 0;border-bottom:1px dashed var(--line)}
+.field span{font:11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding-top:3px}
+.field b{font-weight:500;line-height:1.5}.field .miss{color:var(--warn)}
+.copy{border:0;border-radius:12px;padding:11px 18px;font:700 14px var(--display);cursor:pointer;color:#04050a;background:linear-gradient(120deg,var(--ok),var(--accent2));margin-top:14px}
+.clock{font:700 clamp(28px,5vw,48px) var(--display);letter-spacing:-.03em}
+@media(max-width:640px){.field{grid-template-columns:1fr}}
+</style>
+</head>
+<body class="cpage">
+<div class="sky"></div>
+<header class="ctop"><a class="brand" href="/">&larr; Market Universe</a><span class="sub">Team and submission</span></header>
+<main class="cwrap" id="main"><p class="sub" style="padding:80px 0">Loading...</p></main>
+<script src="/team.js"></script>
+</body>
+</html>

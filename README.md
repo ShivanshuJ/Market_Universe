@@ -159,3 +159,7 @@ Type only your company name. The app finds the rest itself:
 - **Past**: well-funded companies (>= $40M) whose weekly headcount fell >= 40% from a peak of 300+ people. The curve comes from data; the cause is shown only as linked web coverage, never guessed. Acquired companies are flagged.
 
 Limits we state on screen: direction is read from hiring, not intent; headcount series can lag; coverage links are unverified; "fallen" is relative to peak. A fresh run costs roughly 150 to 400 credits (Groww: 192, ~3.5 min under rate limits). The single-company deep analysis stays at `/index.html?company=NAME&auto=1`.
+
+## The interface (final)
+
+The home page `/` is **Market Universe**: type a company, then travel Past / Present / Future in a 3D scene (distance = size gap, colour = 12-month growth). Clicking anything loads a side rail with the company's profile (one API call, cached); "Open the full page" goes to `/company.html?id=...`. A thin call log at the bottom shows every API call, live or cached, with credits. `/team.html` is the team and submission page (members, form answers, pre-submit checklist). The older card layout stays at `/market.html`.
