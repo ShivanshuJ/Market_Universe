@@ -3,36 +3,39 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Team and submission</title>
+<title>Team Z combinator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="/universe.css">
-<link rel="stylesheet" href="/company.css">
 <style>
-.mem{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
-.mc{border:1px solid var(--line);border-radius:20px;padding:18px;background:linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.015))}
-.mc .av{width:54px;height:54px;border-radius:16px;display:grid;place-items:center;font:700 22px var(--display);color:#04050a;background:linear-gradient(120deg,var(--ok),var(--accent2));margin-bottom:10px}
-.mc h3{margin:0;font:700 22px var(--display)}.mc .r{color:var(--muted);font-size:13px}
-.mc.empty{border-style:dashed;color:var(--muted);display:grid;place-items:center;min-height:150px}
-.st{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
-.st span{font:11px var(--mono);border-radius:99px;padding:3px 10px;border:1px solid var(--line)}
-.st .ok{color:var(--ok);border-color:var(--ok)}.st .no{color:var(--warn);border-color:var(--warn)}
-.chk{list-style:none;margin:0;padding:0}
-.chk li{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px dashed var(--line);font-size:15px}
-.chk input{width:20px;height:20px;margin-top:2px;accent-color:var(--ok)}
-.chk li.done{color:var(--muted);text-decoration:line-through}
-.field{display:grid;grid-template-columns:150px 1fr;gap:12px;padding:10px 0;border-bottom:1px dashed var(--line)}
-.field span{font:11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding-top:3px}
-.field b{font-weight:500;line-height:1.5}.field .miss{color:var(--warn)}
-.copy{border:0;border-radius:12px;padding:11px 18px;font:700 14px var(--display);cursor:pointer;color:#04050a;background:linear-gradient(120deg,var(--ok),var(--accent2));margin-top:14px}
-.clock{font:700 clamp(28px,5vw,48px) var(--display);letter-spacing:-.03em}
-@media(max-width:640px){.field{grid-template-columns:1fr}}
+body{overflow:auto;height:auto;min-height:100%}
+.tp{position:relative;z-index:2;max-width:1180px;margin:0 auto;padding:70px 24px 90px}
+.back{display:inline-block;color:var(--muted);text-decoration:none;font:700 12px var(--mono);letter-spacing:.18em;text-transform:uppercase;margin-bottom:46px}
+.back:hover{color:var(--ink)}
+.kick{font:600 12px var(--mono);letter-spacing:.3em;text-transform:uppercase;color:var(--accent2)}
+.tp h1{font:700 clamp(54px,11vw,150px)/.92 var(--display);letter-spacing:-.05em;margin:12px 0 18px;background:linear-gradient(110deg,#fff 25%,var(--accent2) 60%,var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent}
+.tp .line{max-width:680px;color:#c4cae0;font-size:clamp(16px,2vw,20px);line-height:1.55;margin:0 0 54px}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:20px;perspective:1500px}
+.card{--rx:0deg;--ry:0deg;position:relative;border:1px solid var(--line);border-radius:26px;padding:26px 24px 24px;transform:rotateX(var(--rx)) rotateY(var(--ry));transition:transform .2s ease-out,border-color .3s;
+  background:radial-gradient(circle at var(--gx,30%) var(--gy,0%),rgba(255,255,255,.12),transparent 55%),linear-gradient(160deg,rgba(255,255,255,.08),rgba(255,255,255,.012)),var(--card2);box-shadow:0 40px 70px -36px #000;animation:rise .7s cubic-bezier(.2,.9,.25,1) backwards;animation-delay:calc(var(--i) * 90ms)}
+@keyframes rise{from{opacity:0;transform:translateY(40px) rotateX(20deg)}}
+.card:hover{border-color:rgba(255,255,255,.3)}
+.av{width:68px;height:68px;border-radius:20px;display:grid;place-items:center;font:700 30px var(--display);color:#04050a;margin-bottom:18px;background:linear-gradient(130deg,var(--c1),var(--c2));box-shadow:0 14px 34px -12px var(--c1)}
+.card h2{margin:0 0 4px;font:700 27px/1.1 var(--display);letter-spacing:-.025em}
+.gh{display:inline-flex;align-items:center;gap:7px;color:var(--accent2);text-decoration:none;font:600 14px var(--mono);margin-bottom:18px}
+.gh:hover{text-decoration:underline}
+.f{display:grid;grid-template-columns:78px 1fr;gap:8px;padding:9px 0;border-top:1px dashed var(--line);font-size:14px;align-items:baseline}
+.f span{font:10.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.f b{font-weight:500;font-size:13px;overflow-wrap:anywhere}
+.foot{margin-top:54px;display:flex;gap:12px;flex-wrap:wrap}
+.foot a{border:1px solid var(--line);border-radius:99px;padding:10px 20px;color:var(--ink);text-decoration:none;font:600 14px var(--display);background:rgba(255,255,255,.04);transition:all .2s}
+.foot a:hover{border-color:var(--accent2);transform:translateY(-2px)}
+@media(max-width:560px){.tp{padding-top:56px}}
 </style>
 </head>
-<body class="cpage">
+<body>
 <div class="sky"></div>
-<header class="ctop"><a class="brand" href="/">&larr; Market Universe</a><span class="sub">Team and submission</span></header>
-<main class="cwrap" id="main"><p class="sub" style="padding:80px 0">Loading...</p></main>
+<main class="tp" id="main"></main>
 <script src="/team.js"></script>
 </body>
 </html>
