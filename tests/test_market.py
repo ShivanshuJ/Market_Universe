@@ -103,3 +103,38 @@ class Finders(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Dossier(unittest.TestCase):
+    def test_build_dossier_reads(self):
+        cd = {"crustdata_company_id": 1, "basic_info": {"name": "Acme", "year_founded": 2019},
+              "headcount": {"total": 1000, "growth_absolute": {"yoy": 100}, "growth_percent": {"yoy": 11},
+                            "by_role_percent": {"Engineering": 30.0, "Sales": 10.0, "Legal": 1.0},
+                            "by_role_growth_6m_pct": {"Engineering": 5.0, "Sales": 40.0, "Legal": 90.0},
+                            "by_region_percent": {"Pune": 40.0, "India": 80.0, "Maharashtra, India": 50.0, "Pune Area, India": 3.0, "Mumbai Metropolitan Region": 9.0}},
+              "employee_reviews": {"work_life_balance_rating": 2.0, "culture_and_values_rating": 3.0, "compensation_and_benefits_rating": 4.0,
+                                   "overall_rating": {"rating": 3.2, "total_count": 50}},
+              "funding": {"total_investment_usd": 5e7, "milestones": [{"date": "2026-01-05", "amount_usd": 3e7, "round_type": "series_b", "investors": "VC", "is_fund": False}]},
+              "news": [{"article_title": "Old", "article_publish_date": "2025-01-01"}, {"article_title": "New", "article_publish_date": "2026-01-01"}]}
+        d = market.build_dossier(cd, 50, ["Dev"])
+        self.assertEqual(d["teams"][0]["name"], "Engineering")
+        self.assertEqual([c["name"] for c in d["cities"]], ["Pune"])  # roll-ups removed
+        self.assertEqual(d["news"][0]["title"], "New")
+        joined = " ".join(d["reads"])
+        self.assertIn("Sales", joined)  # fastest team of size ignores tiny Legal
+        self.assertNotIn("Legal", joined)
+        self.assertIn("work-life balance lowest", joined)
+        self.assertIn("5% of current headcount", joined)
+
+
+class CallLog(unittest.TestCase):
+    def test_log_records_cache_and_brief(self):
+        from app import crustdata as c
+        start = c.LOG[-1]["id"] if c.LOG else 0
+        c.log_call("/company/search", {"search": {"query": "wealth management"}}, "live", 0.6, 120)
+        c.log_call("/company/enrich", {"crustdata_company_ids": [1, 2]}, "cache")
+        rows = c.log_since(start)
+        self.assertEqual([r["source"] for r in rows], ["live", "cache"])
+        self.assertEqual(rows[0]["what"], "wealth management")
+        self.assertEqual(rows[1]["what"], "2 companies")
+        self.assertNotIn("body", rows[0])

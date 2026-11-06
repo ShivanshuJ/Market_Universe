@@ -66,6 +66,7 @@ function spark(a, color){
   var pts = a.map(function(v, i){ return (i * W / (a.length - 1)).toFixed(1) + "," + (H - 3 - (H - 8) * (v - mn) / Math.max(1, mx - mn)).toFixed(1); }).join(" ");
   return '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none"><polyline fill="none" stroke="' + (color || "var(--accent)") + '" stroke-width="2.2" points="' + pts + '"/></svg>';
 }
+function more(id, name){ return '<button class="pf-btn" data-id="' + id + '" data-name="' + esc(name) + '">Load full profile &rarr;</button>'; }
 function deep(name){ return '<a class="go" href="/index.html?company=' + encodeURIComponent(name) + '&auto=1" target="_blank">Deep analysis of ' + esc(name) + ' &rarr;</a>'; }
 
 /* ---------------- the page ---------------- */
@@ -104,7 +105,7 @@ function rivalCard(r, mine, isMe){
   var rows = [["6 months", sgn(r.g6)], ["Open roles", nf(r.open_roles)], ["Employee rating", r.rating ? r.rating + " / 5 (" + nf(r.reviews) + " reviews)" : "n/a"],
     ["Last round", r.last_round ? esc(r.last_round) + (r.last_round_date ? " · " + ym(r.last_round_date) : "") : "n/a"], ["Raised", usd(r.raised_usd)], ["Follower growth", sgn(r.followers_yoy)]];
   var back = '<div class="back-scroll"><span class="t-l">How they are performing</span>' + rows.map(function(x){ return '<div class="mini-row"><span>' + x[0] + '</span><b>' + x[1] + '</b></div>'; }).join("") +
-    (r.flags && r.flags.length ? '<div class="sub" style="margin-top:6px">Data notes: ' + esc(r.flags.join("; ")) + '</div>' : '') + (isMe ? "" : deep(r.name)) + '</div>';
+    (r.flags && r.flags.length ? '<div class="sub" style="margin-top:6px">Data notes: ' + esc(r.flags.join("; ")) + '</div>' : '') + (r.id ? more(r.id, r.name) : "") + '</div>';
   return fcard(front, back, {h: 262, cls: isMe ? "you" : ""});
 }
 function renderPresent(res){
@@ -128,7 +129,7 @@ function futureCard(c){
     '<div class="mini-row"><span>Headcount, 12 months</span><b>' + sgn(c.g12) + '</b></div>' +
     '<div class="mini-row"><span>Funding</span><b>' + (c.funding ? esc(c.funding) + " · " + usd(c.raised_usd) : "n/a") + '</b></div>' +
     '<p class="fs" style="margin-top:8px"><b>Not a current rival because:</b> ' + esc(c.why_not_rival) + '.</p>' +
-    '<p class="fs"><b>How we found it:</b> its description matches "' + esc(c.theme_query) + '", and its team and open roles agree.</p>' + deep(c.name) + '</div>';
+    '<p class="fs"><b>How we found it:</b> its description matches "' + esc(c.theme_query) + '", and its team and open roles agree.</p>' + more(c.id, c.name) + '</div>';
   return fcard(front, back, {h: 262});
 }
 function renderFuture(res){
@@ -156,7 +157,7 @@ function pastCard(c){
     (st ? '<div class="mini-row"><span>Steepest half-year</span><b>&minus;' + Math.round(100 * st.drop) + '% (' + ym(st.from) + ' to ' + ym(st.to) + ')</b></div>' : '') +
     '<div class="mini-row"><span>Raised</span><b>' + usd(c.raised_usd) + '</b></div>' +
     (c.acquired ? '<p class="fs warnbox">Marked as acquired: part of the drop may be integration, not failure.</p>' : '') +
-    '<span class="t-l" style="margin-top:8px">Reported coverage (links; not verified by us)</span>' + cov + '</div>';
+    '<span class="t-l" style="margin-top:8px">Reported coverage (links; not verified by us)</span>' + cov + more(c.id, c.name) + '</div>';
   return fcard(front, back, {h: 300});
 }
 function renderPast(res){
@@ -167,3 +168,48 @@ function renderPast(res){
   el.innerHTML = note + '<div class="grid3">' + list.map(pastCard).join("") + '</div>';
   wireCards(el);
 }
+
+
+/* ---------------- full profile panel: one API call when a card asks for it ---------------- */
+var dosCache = {};
+function bar(pct, max){ return '<span class="bar"><i style="width:' + Math.min(100, 100 * pct / max) + '%"></i></span>'; }
+function dossierHtml(d){
+  var h = '<div class="dos-head"><div><h2>' + esc(d.name) + '</h2><div class="sub">' + [d.hq, d.founded ? "founded " + d.founded : "", d.type].filter(Boolean).map(esc).join(" · ") + '</div></div>' +
+    '<button class="dos-x" aria-label="Close">&times;</button></div>';
+  if(d.reads && d.reads.length) h += '<div class="reads"><span class="t-l">What this tells you</span><ul>' + d.reads.map(function(x){ return '<li>' + esc(x) + '</li>'; }).join("") + '</ul></div>';
+  if(d.description) h += '<p class="fs">' + esc(d.description) + '</p>';
+  var kp = [["People", nf(d.headcount)], ["Added in 12 months", d.added_12m != null ? (d.added_12m > 0 ? "+" : "") + nf(d.added_12m) + " (" + sgn(d.g12) + ")" : "n/a"],
+    ["Open roles", nf(d.open_roles)], ["Raised", usd(d.raised_usd) + (d.round_count ? " in " + d.round_count + " rounds" : "")],
+    ["Revenue (estimate)", d.revenue_band ? usd(d.revenue_band[0]) + " to " + usd(d.revenue_band[1]) : "n/a"], ["Employee rating", d.rating ? d.rating + " / 5 (" + nf(d.reviews) + ")" : "n/a"]];
+  h += '<div class="kp">' + kp.map(function(x){ return '<div><span>' + x[0] + '</span><b>' + x[1] + '</b></div>'; }).join("") + '</div>';
+  if(d.stats && d.stats.spark && d.stats.spark.length > 3) h += '<div class="dos-spark">' + spark(d.stats.spark) + '<span class="t-l">headcount, weekly (peak ' + nf(d.stats.peak) + ', now ' + nf(d.stats.now) + ')</span></div>';
+  if(d.teams.length) h += '<span class="t-l">Where the people are (share of staff, 6-month change)</span>' + d.teams.map(function(t){
+    return '<div class="rowb"><span>' + esc(t.name) + '</span>' + bar(t.share, d.teams[0].share) + '<b>' + t.share + '%</b><em>' + sgn(t.g6) + '</em></div>'; }).join("");
+  if(d.cities.length) h += '<span class="t-l" style="margin-top:8px">Main cities</span><div class="chips">' + d.cities.map(function(c){ return '<span class="chp">' + esc(c.name) + ' ' + c.share + '%</span>'; }).join("") + '</div>';
+  if(d.ratings.length) h += '<span class="t-l" style="margin-top:10px">What employees say (out of 5)</span>' + d.ratings.map(function(r){
+    return '<div class="rowb"><span>' + esc(r.label) + '</span>' + bar(r.value, 5) + '<b>' + r.value + '</b></div>'; }).join("");
+  if(d.rounds.length) h += '<span class="t-l" style="margin-top:10px">Recent funding</span>' + d.rounds.map(function(r){
+    return '<div class="mini-row"><span>' + esc(r.date) + ' · ' + esc(r.type) + (r.investors ? ' · ' + esc(r.investors) : '') + '</span><b>' + (r.amount_usd ? usd(r.amount_usd) : "n/a") + '</b></div>'; }).join("");
+  if(d.role_titles.length) h += '<span class="t-l" style="margin-top:10px">Roles open right now (sample)</span><div class="chips">' + d.role_titles.map(function(t){ return '<span class="chp">' + esc(t) + '</span>'; }).join("") + '</div>';
+  if(d.news.length) h += '<span class="t-l" style="margin-top:10px">Recent news (links, not verified by us)</span>' + d.news.map(function(n){
+    return '<a class="lnk" href="' + esc(n.url) + '" target="_blank" rel="noopener">' + esc(n.title) + '<small>' + esc(n.publisher || "") + ' · ' + esc((n.date || "").slice(0, 10)) + '</small></a>'; }).join("");
+  h += '<div class="dos-foot">' + (d.website ? '<a class="go" href="' + esc(d.website) + '" target="_blank" rel="noopener">Website</a> ' : '') + deep(d.name) + '</div>';
+  return h;
+}
+function openDossier(id, name){
+  var box = $("dos"), body = $("dosBody"); box.hidden = false; document.body.classList.add("dos-open");
+  var paint = function(html){ body.innerHTML = html; var x = body.querySelector(".dos-x"); if(x) x.onclick = closeDossier; };
+  if(dosCache[id]){ paint(dossierHtml(dosCache[id])); return; }
+  paint('<div class="dos-head"><h2>' + esc(name) + '</h2><button class="dos-x" aria-label="Close">&times;</button></div><p class="sub">Fetching the full profile (about 2 credits)...</p>');
+  fetch("/api/dossier?id=" + encodeURIComponent(id)).then(function(r){ return r.json(); }).then(function(d){
+    if(d.error){ paint('<div class="dos-head"><h2>' + esc(name) + '</h2><button class="dos-x">&times;</button></div><div class="warnbox">' + esc(d.error) + '</div>'); return; }
+    dosCache[id] = d; paint(dossierHtml(d));
+  }).catch(function(){ paint('<div class="warnbox">Could not reach the server.</div>'); });
+}
+function closeDossier(){ $("dos").hidden = true; document.body.classList.remove("dos-open"); }
+document.addEventListener("click", function(e){
+  var b = e.target.closest && e.target.closest(".pf-btn");
+  if(b){ e.stopPropagation(); e.preventDefault(); openDossier(b.getAttribute("data-id"), b.getAttribute("data-name")); return; }
+  if(e.target.id === "dos") closeDossier();
+}, true);
+document.addEventListener("keydown", function(e){ if(e.key === "Escape") closeDossier(); });

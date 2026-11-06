@@ -108,6 +108,27 @@ class H(BaseHTTPRequestHandler):
             if fmt == "email":
                 return self._text(export.email_draft(res), "text/plain")
             return self._text(export.render_markdown(res), "text/markdown", "%s-competitor-read.md" % name)
+        if path == "/api/calllog":
+            from .crustdata import log_since
+            try:
+                after = int((q.get("after") or ["0"])[0])
+            except ValueError:
+                after = 0
+            return self._json(log_since(after))
+        if path == "/api/dossier":
+            try:
+                cid = int((q.get("id") or ["0"])[0])
+            except ValueError:
+                return self._json({"error": "bad id"}, 400)
+            from .crustdata import Client, CrustdataError
+            st = settings()
+            cl = Client(st["crustdata_key"], STORE, budget=20, offline=False)
+            try:
+                return self._json(market.company_dossier(cl, cid))
+            except CrustdataError as e:
+                return self._json({"error": str(e)}, 502)
+            except Exception as e:  # noqa: BLE001
+                return self._json({"error": "could not load: %s" % e}, 500)
         if path == "/api/config":
             s = settings()
             return self._json({"offline": s["offline"], "has_crustdata_key": bool(s["crustdata_key"]),

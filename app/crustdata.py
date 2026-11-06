@@ -1,7 +1,9 @@
 """Crustdata client: auth headers, timeouts, 429 retry using x-ratelimit-reset, error classes,
 response cache (a retry or resume never re-spends credits) and a credit budget guard."""
+import collections
 import hashlib
 import json
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -20,6 +22,40 @@ class CrustdataError(Exception):
 
 class OutOfCredits(CrustdataError):
     """402: retrying will not help."""
+
+
+# In-memory ring buffer of recent API calls, shown in the UI's call log. Holds no keys and no response bodies.
+LOG = collections.deque(maxlen=400)
+_LOG_LOCK = threading.Lock()
+_LOG_SEQ = [0]
+
+
+def _brief(path, body):
+    """A short human description of what a call asks for."""
+    b = body or {}
+    if "search" in b and isinstance(b["search"], dict):
+        return (b["search"].get("query") or "")[:70]
+    if "crustdata_company_ids" in b:
+        return "%d compan%s" % (len(b["crustdata_company_ids"]), "y" if len(b["crustdata_company_ids"]) == 1 else "ies")
+    if "query" in b:
+        return str(b["query"])[:70]
+    f = b.get("filters")
+    if isinstance(f, dict):
+        conds = f.get("conditions") or [f]
+        return ", ".join("%s %s %s" % (str(c.get("field", "")).split(".")[-1], c.get("type", ""), str(c.get("value", ""))[:20]) for c in conds[:2])
+    return ""
+
+
+def log_call(path, body, source, credits=0.0, ms=0, status="ok"):
+    with _LOG_LOCK:
+        _LOG_SEQ[0] += 1
+        LOG.append({"id": _LOG_SEQ[0], "ts": time.strftime("%H:%M:%S"), "path": path, "what": _brief(path, body), "source": source,
+                    "credits": round(credits, 2), "ms": int(ms), "status": status})
+
+
+def log_since(after=0):
+    with _LOG_LOCK:
+        return [e for e in LOG if e["id"] > after]
 
 
 class BudgetExceeded(Exception):
@@ -44,6 +80,7 @@ class Client:
             hit = self.store.cache_get(ck)
             if hit is not None:
                 self.cache_hits += 1
+                log_call(path, body, "cache")
                 return hit
         if self.offline:
             return fixtures.answer(path, body)
@@ -51,7 +88,13 @@ class Client:
             raise BudgetExceeded("credit budget of %s reached (spent %.2f)" % (self.budget, self.spent))
         if not self.key:
             raise CrustdataError(401, "CRUSTDATA_KEY is not set")
-        data, credits = self._http(path, body, method)
+        t0 = time.time()
+        try:
+            data, credits = self._http(path, body, method)
+        except Exception as e:  # noqa: BLE001
+            log_call(path, body, "live", 0.0, (time.time() - t0) * 1000, "error %s" % getattr(e, "status", "") if hasattr(e, "status") else "error")
+            raise
+        log_call(path, body, "live", credits, (time.time() - t0) * 1000)
         self.calls += 1
         self.spent += credits
         self.store.add_credits(self.run_id, credits)
