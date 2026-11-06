@@ -104,7 +104,7 @@ class Client:
 
     def _http(self, path, body, method):
         headers = {"authorization": "Bearer " + self.key, "content-type": "application/json",
-                   "x-api-version": VERSION, "user-agent": "orgchart-xray/0.1"}
+                   "x-api-version": VERSION, "user-agent": "market-universe/0.1"}
         last = None
         for attempt in range(6):
             req = urllib.request.Request(BASE + path, method=method, headers=headers,

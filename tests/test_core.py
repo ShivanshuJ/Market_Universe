@@ -561,7 +561,7 @@ class Predictions(unittest.TestCase):
         self.assertGreaterEqual(res["court"]["summary"]["killed"], 1)
         self.assertEqual(len(st.list_predictions()), len(res["court"]["predictions"]))
         self.assertTrue(all(len(p["id"]) == 64 for p in st.list_predictions()))
-        self.assertIn("X-Ray rejected", res["brief"]["tldr"])
+        self.assertIn("Market Universe rejected", res["brief"]["tldr"])
 
 
 class CacheNeverRespends(unittest.TestCase):

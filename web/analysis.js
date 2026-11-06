@@ -25,7 +25,7 @@ var MARK = {pass: "✓", warn: "!", fail: "✗"};
 function render(res){
   $("run").classList.add("done");
   var c = res.company, b = res.brief || {}, sm = (res.court || {}).summary || {}, th = (res.thesis || {}).theses || [], claims = (res.court || {}).claims || [];
-  document.title = c.name + " · deep analysis"; $("ctag").textContent = "window " + res.window.start + " to " + res.window.end;
+  document.title = c.name + " · deep analysis · Market Universe"; $("ctag").textContent = "window " + res.window.start + " to " + res.window.end;
   var killed = claims.filter(function(x){ return x.verdict === "killed"; }).length, weak = claims.filter(function(x){ return x.verdict === "weakened"; }).length, ok = claims.filter(function(x){ return x.verdict === "survived"; }).length;
   var h = '<section class="chero"><div><div class="k">Deep analysis</div><h1>' + esc(c.name) + '</h1><p>' + esc(b.tldr || b.headline || "") + '</p>' +
     '<div class="links"><a href="/company.html?id=' + c.id + '">Company profile</a><a href="/">Market Universe</a></div></div>' +

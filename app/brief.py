@@ -36,13 +36,13 @@ def build_facts(name, a, company_id, court=None, thesis=None):
         add("Claim Court tried %d claims: %d killed, %d weakened, %d survived.%s" % (
             cs["tried"], cs["killed"], cs["weakened"], cs["survived"],
             (" Killed: " + "; ".join(cs["kills"][:3]) + ".") if cs["kills"] else ""),
-            "X-Ray Claim Court: each claim attacked with the checks listed on the page")
+            "Market Universe Claim Court: each claim attacked with the checks listed on the page")
     if thesis:
         t = thesis[0]
         add("Thesis (%s confidence): %s. %d of %d independent checks support it%s." % (
             t["confidence"], t["statement"], t["passes"], t["judged"],
             ("; it is %.1fx as common as at the other companies run" % t["lift"]) if t.get("lift") else ""),
-            "X-Ray thesis engine: distinctiveness, senior anchor, feeder pool, open demand, momentum, exits", t["evidence"])
+            "Market Universe thesis engine: distinctiveness, senior anchor, feeder pool, open demand, momentum, exits", t["evidence"])
     hc = a.get("headcount")
     if hc and hc.get("total"):
         g = (hc.get("growth_percent") or {}).get("yoy")
@@ -130,7 +130,7 @@ def tldr_text(name, a, court=None):
     s += "."
     if court and court["summary"]["killed"]:
         cs = court["summary"]
-        s += " X-Ray rejected %d naive claim%s, e.g. %s." % (cs["killed"], "" if cs["killed"] == 1 else "s", cs["headline_kill"] or "see the court")
+        s += " Market Universe rejected %d naive claim%s, e.g. %s." % (cs["killed"], "" if cs["killed"] == 1 else "s", cs["headline_kill"] or "see the court")
     return s
 
 

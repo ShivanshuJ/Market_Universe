@@ -9,7 +9,7 @@ var HUES = [["#2dffc4", "#27e8ff"], ["#8a6bff", "#27e8ff"], ["#ffbd4a", "#ff4d6d
 Promise.all([load("/team.json"), load("/team.local.json")]).then(function(a){
   var pub = a[0] || {}, loc = a[1] || {};
   var members = (pub.members || []).slice(0, 4).map(function(m, i){ return Object.assign({}, m, (loc.members || [])[i] || {}); });
-  document.title = "Team " + (pub.team_name || "");
+  document.title = "Team " + (pub.team_name || "") + " · Market Universe";
   var h = '<a class="back" href="/">&larr; Market Universe</a><div class="kick">Team</div><h1>' + esc(pub.team_name || "Team") + '</h1>' +
     '<p class="line">' + esc(pub.one_line || "") + '</p><div class="tgrid">' + members.map(function(m, i){
       var rows = [["Roll", m.roll], ["IITK", m.iitk_email], ["Email", m.personal_email]].filter(function(r){ return r[1]; });

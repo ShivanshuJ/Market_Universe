@@ -1,6 +1,6 @@
-# Org Chart X-Ray
+# Market Universe
 
-**An agent that rebuilds a rival's org chart from public hiring data and tells a strategy team where they are investing, with every number sourced.**
+**Type your company. Market Universe finds your rivals, who is heading where you are heading, and who fell, from live hiring data, with every number sourced.**
 
 Built overnight at ContextCon 04, IIT Kanpur (theme: Services, Replaced), on Crustdata's people, company and job data.
 
@@ -24,7 +24,7 @@ Built overnight at ContextCon 04, IIT Kanpur (theme: Services, Replaced), on Cru
 **Where a person is still needed:** when a company name is ambiguous or unknown, the run stops and asks. Interpreting the brief and deciding what to do is left to the strategy team, by design.
 
 ## Claim Court: what makes this different
-Other tools show you what the data says. X-Ray puts each claim on trial and shows which ones survive (`app/court.py`).
+Other tools show you what the data says. Market Universe puts each claim on trial and shows which ones survive (`app/court.py`).
 Each claim is a thing a straightforward tool would tell you, attacked with checks built from traps we hit in real data:
 
 | Attack | Real example from our runs |

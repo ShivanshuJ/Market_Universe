@@ -90,7 +90,7 @@ function renderHero(res){
   wireCards($("hero"));
 }
 
-/* ---------- what X-Ray thinks they are building: a claim, six independent checks, and what would change our mind ---------- */
+/* ---------- what Market Universe thinks they are building: a claim, six independent checks, and what would change our mind ---------- */
 function thesisCard(t){
   var ico = {pass: "✓", fail: "✕", skip: "–"};
   var ticks = t.signals.map(function(s){ return '<span class="sgn ' + s.result + '" title="' + esc(s.name) + ': ' + esc(s.detail) + '"><i>' + ico[s.result] + '</i>' + esc(s.name) + '</span>'; }).join("");
@@ -112,7 +112,7 @@ function renderInsight(res){
     el.innerHTML = '<h2>What this suggests</h2><p class="insight">' + esc(inf.text) + '</p>'; return;
   }
   var peers = (res.thesis.peers || []);
-  el.innerHTML = '<h2>What X-Ray thinks they are building</h2>' +
+  el.innerHTML = '<h2>What Market Universe thinks they are building</h2>' +
     '<div class="sub">A team is only named if it stands out from the other companies run' + (peers.length ? ' (' + esc(peers.join(", ")) + ')' : '') +
     ' and survives independent checks. Public profile data only, so a lean and not a plan. Tap a card for the evidence chain.</div>' +
     '<div class="tgrid">' + th.slice(0, 2).map(thesisCard).join("") + '</div>';
@@ -222,7 +222,7 @@ function renderCourt(res){
   D.cur = 0; D.res = res; D.present = false; document.body.classList.remove("presenting");
   var s = ct.summary;
   el.innerHTML = '<div class="kicker sub" style="letter-spacing:.8px;text-transform:uppercase">Claim Court</div>' +
-    '<h3 style="margin:0 0 4px;font-size:22px">X-Ray put ' + s.tried + ' claims on trial. ' + s.killed + ' did not survive.</h3>' +
+    '<h3 style="margin:0 0 4px;font-size:22px">Market Universe put ' + s.tried + ' claims on trial. ' + s.killed + ' did not survive.</h3>' +
     '<div class="sub">Each card is something a straightforward tool would tell you. Tap a card for the verdict. ← → move, Space flips, P presents.</div>' +
     '<div class="deckwrap" id="deckwrap" tabindex="0"><div class="dctl"><div class="cnt">' +
     ["killed", "weakened", "survived"].map(function(v){ return '<button class="cbtn ' + v + '" data-v="' + v + '"><b>' + s[v] + '</b><span>' + v + '</span></button>'; }).join("") +

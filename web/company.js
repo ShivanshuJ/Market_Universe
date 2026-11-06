@@ -22,7 +22,7 @@ function chart(series, stats){
 }
 
 function page(d){
-  document.title = d.name + " · profile"; $("ctag").textContent = "Crustdata · " + (d.acquired ? "marked as acquired" : "live data");
+  document.title = d.name + " · Market Universe"; $("ctag").textContent = "Crustdata · " + (d.acquired ? "marked as acquired" : "live data");
   var h = '<section class="chero"><div>' + (d.logo ? '<img class="logo-b" src="' + esc(d.logo) + '" alt="" onerror="this.remove()">' : "") +
     '<div class="k">Company profile</div><h1>' + esc(d.name) + '</h1><div class="meta">' + [d.hq, d.founded ? "founded " + d.founded : "", d.type, (d.categories || []).slice(0, 3).join(", ")].filter(Boolean).map(esc).join(" · ") + '</div>' +
     '<p>' + esc(d.description) + '</p><div class="links">' + (d.website ? '<a href="' + esc(d.website) + '" target="_blank" rel="noopener">Website</a>' : "") + (d.linkedin ? '<a href="' + esc(d.linkedin) + '" target="_blank" rel="noopener">LinkedIn</a>' : "") +

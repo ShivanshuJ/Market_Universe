@@ -224,7 +224,7 @@ def main():
     s = settings()
     STORE = Store(s["db"])
     srv = ThreadingHTTPServer(("0.0.0.0", s["port"]), H)
-    print("X-Ray running at http://localhost:%d  (offline=%s)" % (s["port"], s["offline"]))
+    print("Market Universe running at http://localhost:%d  (offline=%s)" % (s["port"], s["offline"]))
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

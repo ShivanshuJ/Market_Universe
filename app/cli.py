@@ -20,7 +20,7 @@ def _print_events(store, run_id, last):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="xray")
+    ap = argparse.ArgumentParser(prog="market-universe")
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
     r.add_argument("request")

@@ -104,9 +104,9 @@ def run_court(a, people, window_start, today, company=None, resolve=None, jobs_t
     om = a["overall_momentum"]
     base = om["label"]
     if base.startswith("not comparable"):
-        claims.append(_claim("C3", "Is hiring speeding up or slowing?", "X-Ray", "Pace cannot be judged: capped sample",
+        claims.append(_claim("C3", "Is hiring speeding up or slowing?", "Market Universe", "Pace cannot be judged: capped sample",
                              [_t("Sample size", "warn", "The people pull was capped (newest first), so comparing halves of the window would fake growth")],
-                             why="X-Ray withholds a pace label when the sample is capped."))
+                             why="Market Universe withholds a pace label when the sample is capped."))
     else:
         counts = [ext_m[m] for m in months]
         labs = {k: pace_label(counts, k) for k in (0, 1, 2)}
@@ -115,7 +115,7 @@ def run_court(a, people, window_start, today, company=None, resolve=None, jobs_t
         stable = len(set(labs.values())) == 1 and len(set(gap_labs.values()) | {labs[0]}) == 1
         flips = {"growing", "fading"} <= directional
         claims.append(_claim(
-            "C3", "Is hiring speeding up or slowing?", "X-Ray", "Hiring pace is %s (%d in the last 6 months vs %d before)" % (base, om["last6"], om["prev"]),
+            "C3", "Is hiring speeding up or slowing?", "Market Universe", "Hiring pace is %s (%d in the last 6 months vs %d before)" % (base, om["last6"], om["prev"]),
             [_t("Profile-lag test", "pass" if len(set(labs.values())) == 1 else "fail" if flips else "warn",
                 "Ignoring the latest 0, 1, 2 months gives: %s, %s, %s (recent months are under-counted because profiles update late)" % (labs[0], labs[1], labs[2])),
              _t("Rule sensitivity", "pass" if len(set(gap_labs.values()) | {labs[0]}) == 1 else "warn",
@@ -129,7 +129,7 @@ def run_court(a, people, window_start, today, company=None, resolve=None, jobs_t
         d1, d2 = real_depts[0], real_depts[1]
         lead, unp = d1["external"] - d2["external"], c["unplaced"]
         claims.append(_claim(
-            "C4", "Which team is hiring the most?", "X-Ray", "%s is the largest team of new hires (%d, ahead of %s by %d)" % (d1["name"], d1["external"], d2["name"], lead),
+            "C4", "Which team is hiring the most?", "Market Universe", "%s is the largest team of new hires (%d, ahead of %s by %d)" % (d1["name"], d1["external"], d2["name"], lead),
             [_t("Missing team labels", "pass" if lead > unp else "warn",
                 "%d hires have no team label; the lead over #2 is %d, so the ranking %s" % (unp, lead, "cannot change" if lead > unp else "could change"))],
             why="The ranking holds even if every unlabelled hire joined the runner-up." if lead > unp else "Unlabelled hires could reorder the top two."))
@@ -145,7 +145,7 @@ def run_court(a, people, window_start, today, company=None, resolve=None, jobs_t
     for dn, s in [x for x in subs if not x[1].get("unreliable")][:2]:
         top = s["top_prev"][0] if s["top_prev"] else None
         claims.append(_claim(
-            "C5", "Is '%s' a real team?" % s["name"], "X-Ray", "%s has %d new hires (in %s)" % (s["name"], s["count"], dn),
+            "C5", "Is '%s' a real team?" % s["name"], "Market Universe", "%s has %d new hires (in %s)" % (s["name"], s["count"], dn),
             [_t("Title check", "pass", "Typical titles: %s" % "; ".join(s["titles"][:2])),
              _t("Source concentration", "pass", ("Most common previous employer: %s (%d)" % (top["name"], top["n"])) if top else "No dominant previous employer")],
             why="Titles are specific, so the label means something."))
@@ -206,7 +206,7 @@ def run_court(a, people, window_start, today, company=None, resolve=None, jobs_t
         cov = min(1.0, cp / hc["total"])
         upper = round(real / cov) if cov else real
         claims.append(_claim(
-            "C10", "Does the count include everyone?", "X-Ray", "%d real hires is a complete count" % real,
+            "C10", "Does the count include everyone?", "Market Universe", "%d real hires is a complete count" % real,
             [_t("Profile coverage", "pass" if cov >= .9 else "warn",
                 "%s profiles on record for about %s people (%d%% coverage), so the true figure may be up to about %d" % (format(cp, ","), format(hc["total"], ","), round(100 * cov), upper))],
             naive={"label": "counted", "value": real}, audited={"label": "plausible upper bound", "value": upper},
@@ -216,7 +216,7 @@ def run_court(a, people, window_start, today, company=None, resolve=None, jobs_t
     if resolve:
         asm = resolve.get("assumed")
         claims.append(_claim(
-            "C11", "Is this the right company?", "X-Ray", "The request means %s" % (resolve["company"]["name"]),
+            "C11", "Is this the right company?", "Market Universe", "The request means %s" % (resolve["company"]["name"]),
             [_t("Name match", "warn" if asm else "pass", asm or "The company name matched exactly"),
              _t("Look-alikes", "warn" if len(resolve.get("alternates") or []) >= 5 else "pass",
                 "%d other records share the name and were set aside (smaller or no website)" % len(resolve.get("alternates") or []))],
@@ -226,17 +226,17 @@ def run_court(a, people, window_start, today, company=None, resolve=None, jobs_t
     if hc and hc.get("last_date"):
         lag = (today - dt.date.fromisoformat(hc["last_date"][:10])).days
         claims.append(_claim(
-            "C12", "Is the data current?", "X-Ray", "The picture is as of %s" % hc["last_date"],
+            "C12", "Is the data current?", "Market Universe", "The picture is as of %s" % hc["last_date"],
             [_t("Series age", "warn" if lag > 21 else "pass", "The headcount series ends %d days ago" % lag)],
             why="Profile data lags real life by up to a month."))
 
-    # ---- C13: X-Ray's own thesis is put on trial too
+    # ---- C13: Market Universe's own thesis is put on trial too
     if thesis:
         t = thesis[0]
         tests = [_t(sg["name"], "pass" if sg["result"] == "pass" else ("fail" if sg["id"] == "exits" else "warn"), sg["detail"])
                  for sg in t["signals"] if sg["result"] != "skip"]
         if tests:
-            claims.append(_claim("C13", "What is the company building?", "X-Ray", t["statement"], tests,
+            claims.append(_claim("C13", "What is the company building?", "Market Universe", t["statement"], tests,
                                  why="%d of %d independent checks support it (%s confidence). %s" % (t["passes"], t["judged"], t["confidence"], t["falsifier"])))
 
     claims.sort(key=lambda x: (ORDER[x["verdict"]], x["id"]))

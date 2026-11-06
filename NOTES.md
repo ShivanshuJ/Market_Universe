@@ -12,8 +12,8 @@ Running notes, newest facts last. The README is the polished version; this is th
 | This trail | `NOTES.md` |
 
 ## Idea and choices
-- Shortlisted ideas: vendor check (Shell Hunter), background check (Backchannel), churn warning, stale job roles, **org chart X-Ray** (chosen).
-- Picked X-Ray because Crustdata's person records carry dated roles, seniority, department tags and previous employers, so a rival's org can be rebuilt from public data.
+- Shortlisted ideas: vendor check (Shell Hunter), background check (Backchannel), churn warning, stale job roles, **Market Universe** (chosen).
+- Picked Market Universe because Crustdata's person records carry dated roles, seniority, department tags and previous employers, so a rival's org can be rebuilt from public data.
 - Buyer: a strategy team at a fintech. Demo company: Groww. Unseen checks: CRED and Cashfree.
 
 ## First look at the data (Groww, before any code)
