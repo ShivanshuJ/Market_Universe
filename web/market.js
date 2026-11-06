@@ -67,7 +67,7 @@ function spark(a, color){
   return '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none"><polyline fill="none" stroke="' + (color || "var(--accent)") + '" stroke-width="2.2" points="' + pts + '"/></svg>';
 }
 function more(id, name){ return '<button class="pf-btn" data-id="' + id + '" data-name="' + esc(name) + '">Load full profile &rarr;</button>'; }
-function deep(name){ return '<a class="go" href="/index.html?company=' + encodeURIComponent(name) + '&auto=1" target="_blank">Deep analysis of ' + esc(name) + ' &rarr;</a>'; }
+function deep(name){ return '<a class="go" href="/analysis.html?company=' + encodeURIComponent(name) + '" target="_blank">Deep analysis of ' + esc(name) + ' &rarr;</a>'; }
 
 /* ---------------- the page ---------------- */
 function render(res){

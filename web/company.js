@@ -26,7 +26,7 @@ function page(d){
   var h = '<section class="chero"><div>' + (d.logo ? '<img class="logo-b" src="' + esc(d.logo) + '" alt="" onerror="this.remove()">' : "") +
     '<div class="k">Company profile</div><h1>' + esc(d.name) + '</h1><div class="meta">' + [d.hq, d.founded ? "founded " + d.founded : "", d.type, (d.categories || []).slice(0, 3).join(", ")].filter(Boolean).map(esc).join(" · ") + '</div>' +
     '<p>' + esc(d.description) + '</p><div class="links">' + (d.website ? '<a href="' + esc(d.website) + '" target="_blank" rel="noopener">Website</a>' : "") + (d.linkedin ? '<a href="' + esc(d.linkedin) + '" target="_blank" rel="noopener">LinkedIn</a>' : "") +
-    '<a href="/index.html?company=' + encodeURIComponent(d.name) + '&auto=1" target="_blank">Deep analysis (claims, thesis) &rarr;</a></div></div>' +
+    '<a href="/analysis.html?company=' + encodeURIComponent(d.name) + '" target="_blank">Deep analysis (claims, thesis) &rarr;</a></div></div>' +
     '<div class="stat3"><div><b>' + nf(d.headcount) + '</b><span>people</span></div><div><b style="color:' + (d.g12 != null && d.g12 < 0 ? "var(--bad)" : "var(--ok)") + '">' + sgn(d.g12) + '</b><span>12 months</span></div><div><b>' + nf(d.open_roles) + '</b><span>open roles</span></div></div></section>';
   if(d.reads && d.reads.length) h += '<section class="sec"><h2>What this tells you</h2><div class="reads2">' + d.reads.map(function(x){ return '<div>' + esc(x) + '</div>'; }).join("") + '</div></section>';
   h += '<section class="sec"><h2>Headcount over time</h2>' + chart(d.series, d.stats) + '</section>';

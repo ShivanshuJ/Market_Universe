@@ -264,7 +264,7 @@ function dossierHtml(d){
   if(d.news.length) h += '<span class="t-l" style="margin-top:10px">Recent news (links, not verified by us)</span>' + d.news.map(function(n){
     return '<a class="lnk" href="' + esc(n.url) + '" target="_blank" rel="noopener">' + esc(n.title) + '<small>' + esc(n.publisher || "") + ' · ' + esc((n.date || "").slice(0, 10)) + '</small></a>'; }).join("");
   h += '<div class="dos-foot">' + (d.website ? '<a class="go" href="' + esc(d.website) + '" target="_blank" rel="noopener">Website</a>' : '') +
-    '<a class="go" href="/index.html?company=' + encodeURIComponent(d.name) + '&auto=1" target="_blank">Deep analysis &rarr;</a></div>';
+    '<a class="go" href="/analysis.html?company=' + encodeURIComponent(d.name) + '" target="_blank">Deep analysis &rarr;</a></div>';
   return h;
 }
 var railFor = null;
