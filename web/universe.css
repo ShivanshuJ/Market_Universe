@@ -105,7 +105,7 @@ button,input{font:inherit;color:inherit}
   linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px) 0 0/100% 25%,linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px) 0 0/16.66% 100%,rgba(39,232,255,.04);box-shadow:0 40px 80px -30px rgba(39,232,255,.3)}
 .axl{position:absolute;font:11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .axl.x{left:0;right:0;bottom:-30px;text-align:center}
-.axl.y{left:-34px;top:50%;transform:rotate(-90deg) translateX(50%);transform-origin:left top;white-space:nowrap}
+.axl.y{left:14px;top:50%;transform:rotate(-90deg) translateX(50%);transform-origin:left top;white-space:nowrap}
 .fb{position:absolute;width:var(--s);height:var(--s);margin:calc(var(--s) / -2) 0 0 calc(var(--s) / -2);left:var(--fx);top:var(--fy);cursor:pointer;opacity:0;transform:translateZ(var(--z,0px)) scale(.2)}
 .uni.go .fb{animation:fbin .9s cubic-bezier(.2,1.2,.3,1) forwards;animation-delay:calc(var(--i) * 140ms + .6s)}
 @keyframes fbin{to{opacity:1;transform:translateZ(var(--z,0px)) scale(1)}}
@@ -214,3 +214,28 @@ a.go{display:inline-block;margin-top:10px;font-size:13px;font-weight:700;color:v
 .rail .dos-head h2{font-size:26px}
 .rail .full{display:inline-block;margin:10px 0 2px;padding:9px 14px;border-radius:12px;background:linear-gradient(120deg,var(--ok),var(--accent2));color:#04050a;font:700 13px var(--display);text-decoration:none}
 @media (max-width:760px){.rail{top:56px}.hud{right:56px;left:12px}}
+
+/* ---- flat projected diagram: every body is clickable ---- */
+.world .cap{pointer-events:none}
+.stage{transform:none!important}
+.field{position:relative;width:var(--W);height:var(--H)}
+.field .ring{border-radius:50%}
+.field .ring em{transform:translateX(-50%);background:transparent;top:-8px}
+.sweepbox{position:absolute;left:50%;top:50%;width:var(--W);height:var(--H);margin:calc(var(--H) / -2) 0 0 calc(var(--W) / -2);overflow:hidden;border-radius:50%;pointer-events:none}
+.sweepbox .sweep{position:absolute;left:50%;top:50%;width:var(--W);height:var(--W);margin:calc(var(--W) / -2) 0 0 calc(var(--W) / -2);border-radius:50%;
+  background:conic-gradient(from 0deg,transparent 88%,rgba(45,255,196,.13) 99.6%,transparent);animation:spin 8s linear infinite}
+.field .orb{transform:translate(var(--x),var(--y)) scale(var(--sc,1));transform-style:flat}
+@keyframes orbin{from{opacity:0;transform:translate(0,0) scale(.1)}to{opacity:1;transform:translate(var(--x),var(--y)) scale(var(--sc,1))}}
+.orb .nm{background:rgba(4,5,10,.62);padding:2px 9px;border-radius:99px;backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.08)}
+.fb .nm{background:rgba(4,5,10,.62);padding:2px 9px;border-radius:99px;border:1px solid rgba(255,255,255,.08)}
+.wall{transform:none!important}
+.fb{transform:scale(.2)}
+.uni.go .fb{animation:fbin2 .9s cubic-bezier(.2,1.2,.3,1) forwards;animation-delay:calc(var(--i) * 140ms + .6s)}
+@keyframes fbin2{to{opacity:1;transform:scale(1)}}
+.fb .nm{z-index:2}
+.legend{position:absolute;left:36px;bottom:48px;max-width:min(430px,40vw);display:flex;flex-wrap:wrap;gap:6px;z-index:6}
+.lg{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:rgba(10,12,20,.7);backdrop-filter:blur(8px);border-radius:99px;padding:5px 11px;font:600 12px var(--display);color:var(--ink);cursor:pointer;transition:all .2s}
+.lg:hover,.lg.sel{border-color:#fff;transform:translateY(-2px)}
+.lg i{width:9px;height:9px;border-radius:50%;display:block}
+.lg b{font:700 11px var(--mono);color:var(--muted)}
+@media(max-width:760px){.legend{left:14px;bottom:44px;max-width:calc(100vw - 28px)}}

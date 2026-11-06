@@ -74,24 +74,50 @@ function ringFrac(k){ return clamp(0.28 + 0.72 * Math.log(Math.max(k, 1)) / Math
 /* ---------------- build the three worlds ---------------- */
 function cap(kind, k, h, p){ return '<div class="cap"><div class="k">' + k + '</div><h2>' + h + '</h2><p>' + p + '</p></div>'; }
 
+var SQ = 0.56, SQ_SAVE = 0.56;  /* vertical squash that gives the flat disk its tilted look */
+function relax(pts, fixed, W, H, iters){
+  /* push overlapping bodies apart so every one is visible and clickable. pts: [{x,y,r}] in px from the centre. */
+  for(var it = 0; it < iters; it++){
+    for(var i = 0; i < pts.length; i++) for(var j = i + 1; j < pts.length; j++){
+      var dx = pts[j].x - pts[i].x, dy = (pts[j].y - pts[i].y) / SQ, d = Math.sqrt(dx * dx + dy * dy) || .01, need = pts[i].r + pts[j].r;
+      if(d < need){
+        var push = (need - d) / 2, ux = dx / d, uy = dy / d, fi = fixed[i] ? 0 : 1, fj = fixed[j] ? 0 : 1, tot = fi + fj || 1;
+        pts[i].x -= ux * push * 2 * fi / tot; pts[i].y -= uy * push * 2 * fi / tot * SQ;
+        pts[j].x += ux * push * 2 * fj / tot; pts[j].y += uy * push * 2 * fj / tot * SQ;
+      }
+    }
+    pts.forEach(function(p, i){ if(!fixed[i]){ p.x = clamp(p.x, -W / 2 + p.r, W / 2 - p.r); p.y = clamp(p.y, -H / 2 + p.r * SQ, H / 2 - p.r * SQ); } });
+  }
+}
+function legend(items){
+  return '<div class="legend">' + items.map(function(x){
+    return '<button class="lg" data-k="' + x.k + '" data-i="' + x.i + '"><i style="background:' + x.c + '"></i>' + esc(x.n) + '<b>' + x.v + '</b></button>'; }).join("") + '</div>';
+}
 function renderPresent(res){
   var me = res.company, mine = me.headcount || 1, rivals = res.present.rivals.slice().sort(function(a, b){ return (b.g12 == null ? -99 : b.g12) - (a.g12 == null ? -99 : a.g12); });
   var meG = (res.present.me && res.present.me.g12 != null) ? res.present.me.g12 : (me.stats ? me.stats.g12 : null);
-  var D = Math.min(innerWidth * 0.7, innerHeight * 1.2), maxhc = Math.max.apply(null, [mine].concat(rivals.map(function(r){ return r.headcount || 0; })));
+  var W = Math.min(innerWidth * 0.78, innerHeight * 1.5), H = W * SQ, maxhc = Math.max.apply(null, [mine].concat(rivals.map(function(r){ return r.headcount || 0; })));
   var faster = meG == null ? null : rivals.filter(function(r){ return r.g12 != null && r.g12 > meG; }).length;
-  var h = cap("present", "Present · " + rivals.length + " rivals", "Who you<br>fight now",
+  var h = cap("present", "Present \u00b7 " + rivals.length + " rivals", "Who you<br>fight now",
     "Distance from you is how different they are in <b>size</b>. Colour is <b>12-month growth</b>, red to green. Clockwise from the top: fastest growing first." +
     (faster != null ? " <b>" + faster + " of " + rivals.length + "</b> are growing faster than you." : ""));
-  var rings = [[ringFrac(4), "4x size gap"], [ringFrac(2), "2x"], [0.28, "similar size"]].map(function(r, i){
-    return '<div class="ring" style="width:' + (D * r[0]) + 'px;height:' + (D * r[0]) + 'px"><em>' + r[1] + '</em></div>'; }).join("");
+  var rings = [[ringFrac(4), "4x size gap"], [ringFrac(2), "2x"], [0.28, "similar size"]].map(function(r){
+    return '<div class="ring" style="width:' + (W * r[0]) + 'px;height:' + (W * r[0] * SQ) + 'px"><em>' + r[1] + '</em></div>'; }).join("");
+  var pts = [{x: 0, y: 0, r: 78}], fixed = [true];
+  rivals.forEach(function(r, i){
+    var ratio = (r.headcount || mine) / mine, k = ratio >= 1 ? ratio : 1 / ratio, rad = ringFrac(k) * W / 2 * 0.95, a = -Math.PI / 2 + 2 * Math.PI * i / rivals.length;
+    var s = 40 + 40 * Math.sqrt((r.headcount || 1) / maxhc);
+    pts.push({x: Math.cos(a) * rad, y: Math.sin(a) * rad * SQ, r: s / 2 + 26, s: s}); fixed.push(false);
+  });
+  relax(pts, fixed, W, H, 60);
   var orbs = rivals.map(function(r, i){
-    var ratio = (r.headcount || mine) / mine, k = ratio >= 1 ? ratio : 1 / ratio, rad = ringFrac(k) * D / 2 * 0.97, a = -Math.PI / 2 + 2 * Math.PI * i / rivals.length;
-    var s = 30 + 46 * Math.sqrt((r.headcount || 1) / maxhc);
-    return '<div class="orb" data-k="rival" data-i="' + i + '" style="--i:' + (i + 1) + ';--s:' + s.toFixed(0) + 'px;--c:' + gcolor(r.g12) + ';--x:' + (Math.cos(a) * rad).toFixed(0) + 'px;--y:' + (Math.sin(a) * rad).toFixed(0) + 'px">' +
+    var p = pts[i + 1], depth = (p.y / (H / 2) + 1) / 2, sc = 0.86 + 0.3 * depth;
+    return '<div class="orb" data-k="rival" data-i="' + i + '" style="--i:' + (i + 1) + ';--s:' + p.s.toFixed(0) + 'px;--c:' + gcolor(r.g12) + ';--x:' + p.x.toFixed(0) + 'px;--y:' + p.y.toFixed(0) + 'px;--sc:' + sc.toFixed(2) + ';z-index:' + (1000 + Math.round(p.y)) + '">' +
       '<div class="ball"></div><div class="nm">' + esc(r.name) + '<small>' + sgn(r.g12) + '</small></div></div>';
   }).join("");
-  var meOrb = '<div class="orb me" data-k="me" style="--i:0;--s:72px;--c:var(--accent);--x:0px;--y:0px"><div class="ball"></div><div class="nm">' + esc(me.name) + '<small style="color:#fff">you · ' + sgn(meG) + '</small></div></div>';
-  $("w-present").innerHTML = h + '<div class="stage"><div class="disk" style="--D:' + D + 'px"><div class="sweep"></div>' + rings + '<div class="ring r0" style="width:' + (D * 0.2) + 'px;height:' + (D * 0.2) + 'px"></div>' + orbs + meOrb + '</div></div>';
+  var meOrb = '<div class="orb me" data-k="me" style="--i:0;--s:84px;--c:var(--accent);--x:0px;--y:0px;--sc:1;z-index:1000"><div class="ball"></div><div class="nm">' + esc(me.name) + '<small style="color:#fff">you \u00b7 ' + sgn(meG) + '</small></div></div>';
+  var lg = legend([{k: "me", i: 0, c: "var(--accent)", n: me.name + " (you)", v: sgn(meG)}].concat(rivals.map(function(r, i){ return {k: "rival", i: i, c: gcolor(r.g12), n: r.name, v: sgn(r.g12)}; })));
+  $("w-present").innerHTML = h + '<div class="stage"><div class="field" style="--W:' + W + 'px;--H:' + H + 'px"><div class="sweepbox"><div class="sweep"></div></div>' + rings + orbs + meOrb + '</div></div>' + lg;
   R._rivals = rivals; R._meG = meG;
 }
 
@@ -106,12 +132,19 @@ function renderFuture(res){
     return;
   }
   var maxS = Math.max(0.2, Math.max.apply(null, list.map(function(c){ return c.share || 0; }))) * 1.15, maxhc = Math.max.apply(null, list.map(function(c){ return c.headcount || 1; }));
+  var WW = Math.min(800, innerWidth * 0.6), HH = Math.min(470, innerHeight * 0.54), pts = [], fixed = [];
+  list.forEach(function(c){
+    var fx = 8 + 84 * (c.share || 0) / maxS, fy = c.g12 == null ? 50 : 90 - 80 * clamp((c.g12 + 20) / 80, 0, 1), s = 46 + 34 * Math.sqrt((c.headcount || 1) / maxhc);
+    pts.push({x: (fx / 100 - .5) * WW, y: (fy / 100 - .5) * HH, r: s / 2 + 28, s: s}); fixed.push(false);
+  });
+  SQ_SAVE = SQ; SQ = 1; relax(pts, fixed, WW, HH, 80); SQ = SQ_SAVE;
   var bubbles = list.map(function(c, i){
-    var fx = 8 + 84 * (c.share || 0) / maxS, fy = c.g12 == null ? 50 : 90 - 80 * clamp((c.g12 + 20) / 80, 0, 1), s = 36 + 36 * Math.sqrt((c.headcount || 1) / maxhc);
-    return '<div class="fb" data-k="future" data-i="' + i + '" style="--i:' + i + ';--s:' + s.toFixed(0) + 'px;--fx:' + fx.toFixed(1) + '%;--fy:' + fy.toFixed(1) + '%;--z:' + ((i % 3) * 34) + 'px"><div class="ball"></div>' +
+    var p = pts[i];
+    return '<div class="fb" data-k="future" data-i="' + i + '" style="--i:' + i + ';--s:' + p.s.toFixed(0) + 'px;--fx:' + ((p.x / WW + .5) * 100).toFixed(1) + '%;--fy:' + ((p.y / HH + .5) * 100).toFixed(1) + '%"><div class="ball"></div>' +
       '<div class="nm">' + esc(c.name) + '<small>' + (c.share != null ? Math.round(100 * c.share) + "% on it" : "") + '</small></div></div>';
   }).join("");
-  $("w-future").innerHTML = h + '<div class="wall"><div class="plane"></div><div class="axl x">share of their team already on your strategy &rarr;</div><div class="axl y">12-month headcount growth &rarr;</div>' + bubbles + '</div>';
+  var lg = legend(list.map(function(c, i){ return {k: "future", i: i, c: "var(--accent2)", n: c.name, v: c.share != null ? Math.round(100 * c.share) + "%" : ""}; }));
+  $("w-future").innerHTML = h + '<div class="wall"><div class="plane"></div><div class="axl x">share of their team already on your strategy &rarr;</div><div class="axl y">12-month headcount growth &rarr;</div>' + bubbles + '</div>' + lg;
 }
 
 function renderPast(res){
