@@ -9,6 +9,25 @@
   "approach": "Pure-code analysis over Crustdata (company, people, job, web search). No model decides a number. Every claim shows its evidence and can be attacked by the Claim Court. A model, when a key is present, only words the findings and is checked against them.",
   "next": "Watchers for change alerts, sector mode, scoring our stored predictions after their due date, and a signed evidence ledger.",
   "members": [
-    {"name": "Shivanshu Jaiswara", "role": "Builder", "github": ""}
+    {
+      "name": "Shivanshu Jaiswara",
+      "role": "Builder",
+      "github": "ShivanshuJ"
+    },
+    {
+      "name": "Ashish Gautam",
+      "role": "Builder",
+      "github": "booker-de-witt"
+    },
+    {
+      "name": "Kartik Agrawal",
+      "role": "Builder",
+      "github": "luciferk07"
+    },
+    {
+      "name": "Prince Hitwari",
+      "role": "Builder",
+      "github": "princehitwari"
+    }
   ]
 }
