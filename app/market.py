@@ -396,7 +396,7 @@ def _analyse_self(store, name, emit):
 DOSSIER_FIELDS = ["basic_info", "locations", "taxonomy.categories", "taxonomy.professional_network_industry", "headcount.total",
                   "headcount.growth_absolute", "headcount.growth_percent", "headcount.by_role_percent", "headcount.by_role_growth_6m_pct",
                   "headcount.by_region_percent", "funding", "employee_reviews", "news", "revenue.estimated", "revenue.acquisition_status",
-                  "headcount.timeseries"]
+                  "headcount.timeseries", "followers"]
 RATING_LABELS = [("work_life_balance_rating", "Work-life balance"), ("culture_and_values_rating", "Culture"), ("senior_management_rating", "Senior management"),
                  ("compensation_and_benefits_rating", "Pay and benefits"), ("career_opportunities_rating", "Career growth")]
 
@@ -405,28 +405,28 @@ def _top(d, n, key_min=0.0):
     return sorted(((k, v) for k, v in (d or {}).items() if v is not None and v > key_min), key=lambda kv: -kv[1])[:n]
 
 
-def build_dossier(cd, jobs_total, job_titles):
+def build_dossier(cd, jobs_total, job_titles, full=False):
     """Everything worth knowing about one company in a screen, plus plain 'what this means' lines computed by rules."""
     bi, hc, fu = cd.get("basic_info") or {}, cd.get("headcount") or {}, cd.get("funding") or {}
     loc, rv, rev = cd.get("locations") or {}, cd.get("employee_reviews") or {}, cd.get("revenue") or {}
     st = series_stats(hc.get("timeseries"))
     ga, gp = hc.get("growth_absolute") or {}, hc.get("growth_percent") or {}
     role_pct, role_g = hc.get("by_role_percent") or {}, hc.get("by_role_growth_6m_pct") or {}
-    teams = [{"name": k, "share": round(v, 1), "g6": round(role_g[k], 1) if role_g.get(k) is not None else None} for k, v in _top(role_pct, 5)]
+    teams = [{"name": k, "share": round(v, 1), "g6": round(role_g[k], 1) if role_g.get(k) is not None else None} for k, v in _top(role_pct, 10 if full else 5)]
     big = {k: v for k, v in role_g.items() if v is not None and (role_pct.get(k) or 0) >= 2}  # ignore tiny teams for "fastest"
     fastest = max(big.items(), key=lambda kv: kv[1]) if big else None
     # regions: keep city-level entries only (drop country/state roll-ups that double count)
-    regions = [(k, v) for k, v in _top(hc.get("by_region_percent"), 12) if "," not in k and "Greater" not in k and "Area" not in k and "Region" not in k and k != "India"][:4]
+    regions = [(k, v) for k, v in _top(hc.get("by_region_percent"), 12) if "," not in k and "Greater" not in k and "Area" not in k and "Region" not in k and k != "India"][:8 if full else 4]
     ratings = [{"label": lab, "value": rv[k]} for k, lab in RATING_LABELS if rv.get(k)]
     overall = (rv.get("overall_rating") or {})
     rounds = []
-    for m in (fu.get("milestones") or [])[:5]:
+    for m in (fu.get("milestones") or [])[:10 if full else 5]:
         if m.get("is_fund"):
             continue
         rounds.append({"date": (m.get("date") or "")[:7], "type": (m.get("round_type") or "").replace("_", " "), "amount_usd": m.get("amount_usd"),
                        "investors": (m.get("investors") or "")[:90]})
     news = [{"title": n.get("article_title"), "publisher": n.get("article_publisher_name"), "date": n.get("article_publish_date"), "url": n.get("article_url")}
-            for n in sorted((cd.get("news") or []), key=lambda n: n.get("article_publish_date") or "", reverse=True)[:5] if n.get("article_title")]
+            for n in sorted((cd.get("news") or []), key=lambda n: n.get("article_publish_date") or "", reverse=True)[:10 if full else 5] if n.get("article_title")]
     est = (rev.get("estimated") or {})
     reads = []
     if teams:
@@ -451,25 +451,36 @@ def build_dossier(cd, jobs_total, job_titles):
             "stats": st, "teams": teams, "cities": [{"name": k, "share": round(v, 1)} for k, v in regions],
             "ratings": ratings, "rating": overall.get("rating"), "reviews": overall.get("total_count"),
             "raised_usd": fu.get("total_investment_usd"), "round_count": fu.get("num_funding_rounds"), "rounds": rounds,
+            "logo": bi.get("logo_permalink"), "linkedin": bi.get("professional_network_url"), "followers": (cd.get("followers") or {}).get("count"),
+            "followers_yoy": (cd.get("followers") or {}).get("yoy_percent"), "series": _series(hc.get("timeseries")) if full else None,
             "revenue_band": [est.get("lower_bound_usd"), est.get("upper_bound_usd")] if est.get("lower_bound_usd") else None,
             "acquired": rev.get("acquisition_status") == "acquired",
             "open_roles": jobs_total, "role_titles": job_titles, "news": news, "reads": reads}
 
 
-def company_dossier(cl, cid):
+def _series(ts, n=120):
+    vals = [(t["date"][:10], t["employee_count"]) for t in (ts or []) if t.get("employee_count") is not None]
+    step = max(1, len(vals) // n)
+    out = vals[::step]
+    if vals and out[-1] != vals[-1]:
+        out.append(vals[-1])
+    return out
+
+
+def company_dossier(cl, cid, full=False):
     r = cl.call("/company/enrich", {"crustdata_company_ids": [cid], "fields": DOSSIER_FIELDS})
     cd = r[0]["matches"][0]["company_data"]
     total, titles = None, []
     try:
         j = cl.call("/job/search", {"filters": {"field": "company.basic_info.crustdata_company_id", "type": "=", "value": cid},
-                                    "fields": ["job_details"], "limit": 12})
+                                    "fields": ["job_details"], "limit": 40 if full else 12})
         total = j.get("total_count")
         seen = []
         for x in j.get("job_listings") or []:
             t = (x.get("job_details") or {}).get("title")
             if t and t not in seen:
                 seen.append(t)
-        titles = seen[:6]
+        titles = seen[:14 if full else 6]
     except CrustdataError:
         pass
-    return build_dossier(cd, total, titles)
+    return build_dossier(cd, total, titles, full)

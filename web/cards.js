@@ -9,6 +9,7 @@ function tilt(el, max){
   max = max || 6;
   el.addEventListener("pointermove", function(e){
     var r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
+    el.style.setProperty("--gx", ((x + .5) * 100).toFixed(0) + "%"); el.style.setProperty("--gy", ((y + .5) * 100).toFixed(0) + "%");
     el.style.setProperty("--ry", (x * max * 2).toFixed(2) + "deg");
     el.style.setProperty("--rx", (-y * max * 2).toFixed(2) + "deg");
   });

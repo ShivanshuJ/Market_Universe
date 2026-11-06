@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market Universe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="/universe.css">
+</head>
+<body>
+<div class="sky" id="sky"></div>
+
+<header class="top" id="top" hidden>
+  <div class="brand" id="again" title="Start over">Market Universe</div>
+  <nav class="nav" id="nav">
+    <button data-w="past">Past</button><button data-w="present" class="on">Present</button><button data-w="future">Future</button>
+  </nav>
+  <div class="who" id="who"></div>
+</header>
+
+<section class="land" id="land">
+  <div class="logo">Services, replaced &middot; market intelligence</div>
+  <h1>Where does<br>your company stand?</h1>
+  <form class="ask" id="ask" autocomplete="off">
+    <input id="co" type="text" placeholder="Type your company" spellcheck="false" autofocus>
+    <button id="go" type="submit">Map my market &rarr;</button>
+    <div class="eg">try <a data-c="Groww">Groww</a><a data-c="Paytm">Paytm</a><a data-c="Razorpay">Razorpay</a></div>
+  </form>
+  <div class="prog" id="prog">
+    <div class="pnodes" id="pnodes"></div>
+    <div class="pmsg" id="pmsg"></div>
+    <button class="resume" id="resume">Resume</button>
+  </div>
+  <div class="lastlink">or <a id="last">open the last map</a></div>
+</section>
+
+<main class="uni" id="uni">
+  <div class="track" id="track">
+    <section class="world w-past" id="w-past"></section>
+    <section class="world w-present" id="w-present"></section>
+    <section class="world w-future" id="w-future"></section>
+  </div>
+</main>
+
+<aside class="hud" id="hud"></aside>
+<div class="hint" id="hint" hidden>&larr; &rarr; travel through time &middot; click anything</div>
+<aside class="rail" id="rail" hidden><button class="rail-tab" id="railTab" aria-label="Pin the profile panel"><span id="railName">Profile</span></button><div class="rail-body" id="dosBody"></div></aside>
+
+<script src="/universe.js"></script>
+<script src="/calllog.js"></script>
+</body>
+</html>

@@ -124,7 +124,7 @@ class H(BaseHTTPRequestHandler):
             st = settings()
             cl = Client(st["crustdata_key"], STORE, budget=20, offline=False)
             try:
-                return self._json(market.company_dossier(cl, cid))
+                return self._json(market.company_dossier(cl, cid, (q.get("full") or ["0"])[0] == "1"))
             except CrustdataError as e:
                 return self._json({"error": str(e)}, 502)
             except Exception as e:  # noqa: BLE001
@@ -153,7 +153,7 @@ class H(BaseHTTPRequestHandler):
             return self._json(run)
         if path.startswith("/api/stream/"):
             return self._stream(path.rsplit("/", 1)[1])
-        f = WEB / ("market.html" if path in ("/", "") else path.lstrip("/"))
+        f = WEB / ("universe.html" if path in ("/", "") else path.lstrip("/"))
         if f.is_file() and WEB in f.resolve().parents:
             data = f.read_bytes()
             self.send_response(200)

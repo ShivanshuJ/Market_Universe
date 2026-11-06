@@ -76,19 +76,23 @@ function render(res){
   var chips = themes.length ? themes.map(function(t){
     return '<span class="chp ' + (t.confidence === "strong" ? "ok" : t.confidence === "moderate" ? "warn" : "bad") + '" title="' + esc(t.statement) + '">' + esc(t.theme) + ' · ' + esc(t.confidence) + '</span>'; }).join("") :
     '<span class="chp">not enough profile data to say</span>';
-  $("me").innerHTML = '<div class="kicker">Your company</div><p class="tldr">' + esc(me.name) + '</p>' +
-    '<div class="sub">' + esc(me.industry || "industry unknown") + ' · about ' + nf(me.headcount) + ' people' + (me.stats && me.stats.g12 != null ? ' · ' + sgn(me.stats.g12) + ' over 12 months' : '') + '</div>' +
-    '<div style="margin-top:10px"><span class="t-l">What you are building now, read from your own hiring</span><div class="chips">' + chips + '</div></div>' +
-    (res.assumed ? '<div class="warnbox">' + esc(res.assumed) + '</div>' : "") +
-    '<div class="sub" style="margin-top:8px">This reads direction from what you hire for, not from stated strategy. Tap any card for the detail.</div>';
+  var g = me.stats && me.stats.g12 != null ? me.stats.g12 : null;
+  $("me").innerHTML = '<div class="herogrid"><div><div class="kicker">Your company</div><p class="tldr">' + esc(me.name) + '</p>' +
+    '<div class="sub">' + esc(me.industry || "industry unknown") + (me.country ? " · " + esc(me.country) : "") + '</div>' +
+    '<div style="margin-top:14px"><span class="t-l">What you are building now, read from your own hiring</span><div class="chips">' + chips + '</div></div>' +
+    (res.assumed ? '<div class="warnbox">' + esc(res.assumed) + '</div>' : "") + '</div>' +
+    '<div class="orbs"><div class="orb"><b>' + nf(me.headcount) + '</b><span>people</span></div><div class="orb"><b style="color:' + (g != null && g < 0 ? "var(--bad)" : "var(--ok)") + '">' + sgn(g) + '</b><span>12 months</span></div>' +
+    '<div class="orb"><b>' + res.present.rivals.length + '</b><span>rivals found</span></div></div></div>' +
+    '<div class="sub" style="margin-top:14px">Direction is read from what you hire for, not from stated strategy. Tap any card to flip it.</div>';
   var P = res.present.rivals.length, F = res.future.companies.length, A = res.past.companies.length;
   $("tabs").innerHTML = [["present", "Present", P + " rivals", "who you compete with now"], ["future", "Future", F + " companies", "heading where you are heading"], ["past", "Past", A + " fallen", "big once, much smaller now"]].map(function(t, i){
     return '<button class="tab' + (i === 0 ? " on" : "") + '" data-t="' + t[0] + '"><b>' + t[1] + '</b><span>' + t[2] + ' · ' + t[3] + '</span></button>'; }).join("");
   document.querySelectorAll(".tab").forEach(function(b){ b.onclick = function(){ showTab(b.getAttribute("data-t")); }; });
-  renderPresent(res); renderFuture(res); renderPast(res);
+  renderPresent(res); renderFuture(res); renderPast(res); stagger($("out"));
   $("foot").textContent = "Credits this run: " + res.credits + " · " + res.seconds + "s";
   showTab("present");
 }
+function stagger(root){ root.querySelectorAll(".grid3").forEach(function(g){ Array.prototype.forEach.call(g.children, function(c, i){ c.style.setProperty("--i", Math.min(i, 10)); }); }); }
 function showTab(t){
   ["present", "future", "past"].forEach(function(x){ $("p-" + x).hidden = x !== t; });
   document.querySelectorAll(".tab").forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-t") === t); });
@@ -106,7 +110,7 @@ function rivalCard(r, mine, isMe){
     ["Last round", r.last_round ? esc(r.last_round) + (r.last_round_date ? " · " + ym(r.last_round_date) : "") : "n/a"], ["Raised", usd(r.raised_usd)], ["Follower growth", sgn(r.followers_yoy)]];
   var back = '<div class="back-scroll"><span class="t-l">How they are performing</span>' + rows.map(function(x){ return '<div class="mini-row"><span>' + x[0] + '</span><b>' + x[1] + '</b></div>'; }).join("") +
     (r.flags && r.flags.length ? '<div class="sub" style="margin-top:6px">Data notes: ' + esc(r.flags.join("; ")) + '</div>' : '') + (r.id ? more(r.id, r.name) : "") + '</div>';
-  return fcard(front, back, {h: 262, cls: isMe ? "you" : ""});
+  return fcard(front, back, {h: 276, cls: (isMe ? "you " : "") + "v-" + r.verdict});
 }
 function renderPresent(res){
   var el = $("p-present"), rivals = res.present.rivals, me = res.present.me;
@@ -130,7 +134,7 @@ function futureCard(c){
     '<div class="mini-row"><span>Funding</span><b>' + (c.funding ? esc(c.funding) + " · " + usd(c.raised_usd) : "n/a") + '</b></div>' +
     '<p class="fs" style="margin-top:8px"><b>Not a current rival because:</b> ' + esc(c.why_not_rival) + '.</p>' +
     '<p class="fs"><b>How we found it:</b> its description matches "' + esc(c.theme_query) + '", and its team and open roles agree.</p>' + more(c.id, c.name) + '</div>';
-  return fcard(front, back, {h: 262});
+  return fcard(front, back, {h: 276, cls: "v-rising"});
 }
 function renderFuture(res){
   var el = $("p-future"), list = res.future.companies, themes = res.self.themes || [];
@@ -158,7 +162,7 @@ function pastCard(c){
     '<div class="mini-row"><span>Raised</span><b>' + usd(c.raised_usd) + '</b></div>' +
     (c.acquired ? '<p class="fs warnbox">Marked as acquired: part of the drop may be integration, not failure.</p>' : '') +
     '<span class="t-l" style="margin-top:8px">Reported coverage (links; not verified by us)</span>' + cov + more(c.id, c.name) + '</div>';
-  return fcard(front, back, {h: 300});
+  return fcard(front, back, {h: 360, cls: "v-fallen"});
 }
 function renderPast(res){
   var el = $("p-past"), list = res.past.companies, cr = res.past.criteria;
